@@ -51,9 +51,10 @@ def verify_otp(payload: OTPVerify):
             db.add(user); db.commit(); db.refresh(user)
         elif user.role != UserRole.CUSTOMER:
             raise HTTPException(403,"This email belongs to a non-customer account. Please use the appropriate portal login.")
-        token=create_access_token({"sub":user.email,"role":user.role.value})
-        record["token"]=token; record["expires"]=time.time()+_TTL
-        return {"verified":True,"access_token":token,"token_type":"bearer","role":"customer"}
+        access_token=create_access_token({"sub":user.email,"role":user.role.value})
+        otp_token=secrets.token_urlsafe(32)
+        record["token"]=otp_token; record["expires"]=time.time()+_TTL
+        return {"verified":True,"access_token":access_token,"otp_token":otp_token,"token_type":"bearer","role":"customer"}
     finally:
         db.close()
 
