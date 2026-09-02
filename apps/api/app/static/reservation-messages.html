@@ -7,6 +7,71 @@
 </head>
 <body>
 <div id="reservationMessagesApp"></div>
-<script src="/static/reservation-messages.js?v=3"></script>
+<script src="/static/reservation-messages.js?v=4"></script>
+<script>
+(() => {
+  const token = () => localStorage.getItem('stayhub_token') || '';
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const priority = [
+    ['breakfast','Breakfast'],
+    ['hi-speed wifi','Hi-Speed WiFi'],
+    ['high speed wifi','Hi-Speed WiFi'],
+    ['free wifi','Free WiFi'],
+    ['wifi','Free WiFi'],
+    ['fruit basket','Fruit Basket'],
+    ['fruit','Fruit Basket'],
+    ['swimming pool','Swimming Pool'],
+    ['indoor swimming pool','Indoor Swimming Pool'],
+    ['spa and wellness center','Spa and wellness center'],
+    ['spa','SPA'],
+    ['hot tub/jacuzzi','Hot tub/Jacuzzi'],
+    ['room service','Room service'],
+    ['massage','Massage'],
+    ['fitness center','Fitness center'],
+    ['24-hour front desk','24-hour front desk'],
+    ['restaurant','Restaurant']
+  ];
+  const normalize = v => String(v || '').trim().toLowerCase().replace(/\s+/g,' ');
+  const displayName = value => {
+    const n = normalize(value);
+    const found = priority.find(([key]) => n === key || n.includes(key));
+    return found ? found[1] : String(value || '').trim();
+  };
+  const unique = values => {
+    const seen = new Set();
+    return values.filter(Boolean).map(displayName).filter(v => {
+      const k = normalize(v); if (!k || seen.has(k)) return false; seen.add(k); return true;
+    });
+  };
+  async function loadFacilities() {
+    const confirmation = new URLSearchParams(location.search).get('confirmation');
+    if (!confirmation || !token()) return;
+    try {
+      const r = await fetch('/customer/reservations/by-confirmation/' + encodeURIComponent(confirmation), {headers:{Authorization:'Bearer '+token()}});
+      const d = await r.json(); if (!r.ok) return;
+      const reservation = d.reservation || {};
+      const values = unique([...(Array.isArray(reservation.included_value_adds) ? reservation.included_value_adds : []), ...(Array.isArray(reservation.meal_options) && reservation.meal_options.length ? ['Breakfast'] : [])]);
+      if (!values.length) return;
+      const primaryKeys = ['Breakfast','Hi-Speed WiFi','Free WiFi','Fruit Basket','Swimming Pool','Indoor Swimming Pool','Spa and wellness center','SPA','Hot tub/Jacuzzi','Room service','Massage','Fitness center','24-hour front desk','Restaurant'];
+      const ordered = values.sort((a,b) => (primaryKeys.indexOf(a) < 0 ? 999 : primaryKeys.indexOf(a)) - (primaryKeys.indexOf(b) < 0 ? 999 : primaryKeys.indexOf(b)));
+      const first = ordered.slice(0,3), rest = ordered.slice(3);
+      const host = document.getElementById('reservationMessagesApp');
+      const headings = [...host.querySelectorAll('h2')];
+      const title = headings.find(h => /Included facilities & benefits/i.test(h.textContent || ''));
+      if (!title) { setTimeout(loadFacilities, 150); return; }
+      const card = title.closest('.card');
+      if (!card) return;
+      card.innerHTML = `<div class="facility-head"><div><div class="facility-eyebrow">YOUR STAY</div><h2>Included facilities & benefits</h2><p>Only facilities selected for this property are shown.</p></div>${rest.length ? `<button type="button" class="facility-toggle" aria-expanded="false">More facilities <span>⌄</span></button>` : ''}</div><div class="facility-primary">${first.map(x => `<div class="facility-chip"><span>✓</span>${esc(x)}</div>`).join('')}</div>${rest.length ? `<div class="facility-more" hidden>${rest.map(x => `<div class="facility-row"><span>✓</span><b>${esc(x)}</b></div>`).join('')}</div>` : ''}`;
+      const toggle = card.querySelector('.facility-toggle');
+      const more = card.querySelector('.facility-more');
+      if (toggle && more) toggle.onclick = () => { const open = !more.hidden; more.hidden = open; toggle.setAttribute('aria-expanded', String(!open)); toggle.innerHTML = open ? 'More facilities <span>⌄</span>' : 'Hide facilities <span>⌃</span>'; };
+    } catch (_) {}
+  }
+  const style = document.createElement('style');
+  style.textContent = `.facility-head{display:flex;align-items:center;justify-content:space-between;gap:18px}.facility-head h2{margin:0 0 5px}.facility-head p{margin:0;color:#667085;font-size:12px}.facility-eyebrow{font-size:10px;letter-spacing:1.3px;font-weight:900;color:#2563eb;margin-bottom:4px}.facility-primary{display:flex;gap:9px;flex-wrap:wrap;margin-top:17px}.facility-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid #dbe4ef;background:#f8fbff;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:800;color:#172033}.facility-chip span,.facility-row span{color:#15803d;font-weight:900}.facility-toggle{border:1px solid #d7dee8;background:#fff;border-radius:9px;padding:9px 12px;font-weight:800;color:#344054;cursor:pointer;white-space:nowrap}.facility-toggle span{font-size:14px;margin-left:4px}.facility-more{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #edf0f4}.facility-row{display:flex;gap:8px;align-items:center;border:1px solid #edf0f4;border-radius:9px;padding:10px 12px;font-size:12px;background:#fff}@media(max-width:650px){.facility-head{align-items:flex-start;flex-direction:column}.facility-more{grid-template-columns:1fr}.facility-toggle{width:100%}}`;
+  document.head.appendChild(style);
+  loadFacilities();
+})();
+</script>
 </body>
 </html>
