@@ -8,6 +8,7 @@ from app.dependencies import get_current_user
 from app.models.notification import Notification
 from app.models.user import User, UserRole
 from app.models.reservation import Reservation
+from app.models.hotel import Hotel
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
@@ -65,9 +66,14 @@ def _notification_reservation(db: Session, notification: Notification):
 @router.get("")
 def list_notifications(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     rows = db.query(Notification).filter(Notification.user_id == current_user.id).order_by(Notification.created_at.desc()).limit(100).all()
+    hotel_cache = {}
     result = []
     for n in rows:
         reservation = _notification_reservation(db, n)
+        hotel_id = reservation.hotel_id if reservation else n.hotel_id
+        if hotel_id not in hotel_cache:
+            hotel_cache[hotel_id] = db.query(Hotel).filter(Hotel.id == hotel_id).first() if hotel_id else None
+        hotel = hotel_cache[hotel_id]
         result.append({
             "id": n.id,
             "title": n.title,
@@ -77,7 +83,8 @@ def list_notifications(db: Session = Depends(get_db), current_user: User = Depen
             "created_at": n.created_at,
             "reservation_id": reservation.id if reservation else None,
             "confirmation_no": reservation.confirmation_no if reservation else None,
-            "hotel_id": reservation.hotel_id if reservation else n.hotel_id,
+            "hotel_id": hotel_id,
+            "hotel_name": hotel.name if hotel else None,
         })
     return result
 
@@ -92,7 +99,7 @@ def list_message_contacts(db: Session = Depends(get_db), current_user: User = De
 @router.get("/messages")
 def list_messages(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     rows = db.query(Notification).filter(Notification.type.like("message|%")).order_by(Notification.created_at.asc()).limit(500).all()
-    result=[]; cache={}
+    result=[]; cache={}; hotel_cache={}
     for n in rows:
         parsed=_parse_message_type(n.type or "")
         if not parsed: continue
@@ -102,7 +109,11 @@ def list_messages(db: Session = Depends(get_db), current_user: User = Depends(ge
         if recipient_id not in cache: cache[recipient_id]=db.query(User).filter(User.id==recipient_id).first()
         sender,recipient=cache[sender_id],cache[recipient_id]
         reservation=db.query(Reservation).filter(Reservation.id==reservation_id).first() if reservation_id else None
-        result.append({"id":n.id,"reservation_id":reservation_id or None,"confirmation_no":reservation.confirmation_no if reservation else None,"hotel_id":reservation.hotel_id if reservation else n.hotel_id,"sender_id":sender_id,"sender_name":sender.full_name if sender else f"User #{sender_id}","sender_role":sender.role.value if sender else None,"recipient_id":recipient_id,"recipient_name":recipient.full_name if recipient else f"User #{recipient_id}","recipient_role":recipient.role.value if recipient else None,"message":n.message,"created_at":n.created_at,"read":n.read})
+        hotel_id=reservation.hotel_id if reservation else n.hotel_id
+        if hotel_id not in hotel_cache:
+            hotel_cache[hotel_id]=db.query(Hotel).filter(Hotel.id==hotel_id).first() if hotel_id else None
+        hotel=hotel_cache[hotel_id]
+        result.append({"id":n.id,"reservation_id":reservation_id or None,"confirmation_no":reservation.confirmation_no if reservation else None,"hotel_id":hotel_id,"hotel_name":hotel.name if hotel else None,"sender_id":sender_id,"sender_name":sender.full_name if sender else f"User #{sender_id}","sender_role":sender.role.value if sender else None,"recipient_id":recipient_id,"recipient_name":recipient.full_name if recipient else f"User #{recipient_id}","recipient_role":recipient.role.value if recipient else None,"message":n.message,"created_at":n.created_at,"read":n.read})
     return result
 
 @router.post("/messages")
