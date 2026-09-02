@@ -115,6 +115,7 @@ def dashboard_redirect(current_user:User=Depends(get_current_user)):
 
 app.mount("/static",StaticFiles(directory=STATIC_DIR),name="static")
 app.include_router(api_router)
+app.include_router(api_router,prefix="/api")
 
 @app.get("/health")
 async def health():return {"status":"healthy","version":settings.app_version}
