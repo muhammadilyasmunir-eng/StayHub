@@ -26,18 +26,23 @@ class DisputeResolve(BaseModel):
     note: str | None = Field(default=None, max_length=2000)
 
 
-def _guest_for_user(db: Session, user: User) -> Guest:
-    guest = db.query(Guest).filter(Guest.email.ilike(user.email)).first()
-    if not guest:
-        raise HTTPException(404, "No guest profile is linked to this account")
-    return guest
+def _guest_ids_for_user(db: Session, user: User) -> list[int]:
+    """Return every guest profile registered with the customer's email.
+
+    A guest can have multiple profiles when reservations were created separately.
+    Customer access is email-based, so all matching guest profiles must be included.
+    """
+    return [
+        guest.id
+        for guest in db.query(Guest).filter(Guest.email.ilike(user.email)).all()
+    ]
 
 
 def _reservation_for_customer(db: Session, reservation_id: int, user: User) -> Reservation:
-    guest = _guest_for_user(db, user)
+    guest_ids = _guest_ids_for_user(db, user)
     reservation = db.query(Reservation).filter(
         Reservation.id == reservation_id,
-        Reservation.guest_id == guest.id,
+        Reservation.guest_id.in_(guest_ids),
     ).first()
     if not reservation:
         raise HTTPException(404, "Reservation not found")
@@ -55,8 +60,12 @@ def _reservation_payload(db: Session, reservation: Reservation):
 def customer_reservations(
     db: Session = Depends(get_db), current_user: User = Depends(require_customer)
 ):
-    guest = _guest_for_user(db, current_user)
-    rows = db.query(Reservation).filter(Reservation.guest_id == guest.id).order_by(Reservation.created_at.desc()).all()
+    guest_ids = _guest_ids_for_user(db, current_user)
+    if not guest_ids:
+        return []
+    rows = db.query(Reservation).filter(
+        Reservation.guest_id.in_(guest_ids)
+    ).order_by(Reservation.created_at.desc(), Reservation.id.desc()).all()
     result = [_reservation_payload(db, r) for r in rows]
     db.commit()
     return result
@@ -75,13 +84,12 @@ def customer_reservation_detail(
 
 @router.get("/customer/reservations/by-confirmation/{confirmation_no}")
 def customer_reservation_messages(
-    confirmation_no: str,
-    db: Session = Depends(get_db), current_user: User = Depends(require_customer),
+    confirmation_no: str, db: Session = Depends(get_db), current_user: User = Depends(require_customer),
 ):
-    guest = _guest_for_user(db, current_user)
+    guest_ids = _guest_ids_for_user(db, current_user)
     reservation = db.query(Reservation).filter(
         Reservation.confirmation_no == confirmation_no,
-        Reservation.guest_id == guest.id,
+        Reservation.guest_id.in_(guest_ids),
     ).first()
     if not reservation:
         raise HTTPException(404, "Reservation not found")
