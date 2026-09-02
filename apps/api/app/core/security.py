@@ -25,11 +25,11 @@ def verify_password(
     )
 
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
     to_encode = data.copy()
 
     expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.access_token_expire_minutes
+        minutes=expires_minutes if expires_minutes is not None else settings.access_token_expire_minutes
     )
 
     to_encode.update({"exp": expire})
