@@ -9,6 +9,7 @@ from app.models.notification import Notification
 from app.models.user import User, UserRole
 from app.models.reservation import Reservation
 from app.models.hotel import Hotel
+from app.models.reservation_status_dispute import ReservationStatusDispute
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
@@ -67,6 +68,7 @@ def _notification_reservation(db: Session, notification: Notification):
 def list_notifications(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     rows = db.query(Notification).filter(Notification.user_id == current_user.id).order_by(Notification.created_at.desc()).limit(100).all()
     hotel_cache = {}
+    dispute_cache = {}
     result = []
     for n in rows:
         reservation = _notification_reservation(db, n)
@@ -74,6 +76,14 @@ def list_notifications(db: Session = Depends(get_db), current_user: User = Depen
         if hotel_id not in hotel_cache:
             hotel_cache[hotel_id] = db.query(Hotel).filter(Hotel.id == hotel_id).first() if hotel_id else None
         hotel = hotel_cache[hotel_id]
+        dispute_id = None
+        if reservation:
+            if reservation.id not in dispute_cache:
+                dispute_cache[reservation.id] = db.query(ReservationStatusDispute).filter(
+                    ReservationStatusDispute.reservation_id == reservation.id
+                ).order_by(ReservationStatusDispute.created_at.desc()).first()
+            dispute = dispute_cache[reservation.id]
+            dispute_id = dispute.id if dispute else None
         result.append({
             "id": n.id,
             "title": n.title,
@@ -85,6 +95,7 @@ def list_notifications(db: Session = Depends(get_db), current_user: User = Depen
             "confirmation_no": reservation.confirmation_no if reservation else None,
             "hotel_id": hotel_id,
             "hotel_name": hotel.name if hotel else None,
+            "dispute_id": dispute_id,
         })
     return result
 
