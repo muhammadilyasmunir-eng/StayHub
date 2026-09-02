@@ -51,6 +51,10 @@ def customer_login():
 def my_reservations():
     return HTMLResponse((STATIC_DIR/"my-reservations.html").read_text(encoding="utf-8"),headers={"Cache-Control":"no-store, no-cache, must-revalidate"})
 
+@app.get("/reservation-messages",include_in_schema=False)
+def reservation_messages():
+    return HTMLResponse((STATIC_DIR/"reservation-messages.html").read_text(encoding="utf-8"),headers={"Cache-Control":"no-store, no-cache, must-revalidate"})
+
 @app.get("/hotel/{slug}",include_in_schema=False)
 def public_hotel_detail(slug:str):
     html=(STATIC_DIR/"public"/"hotel.html").read_text(encoding="utf-8")
