@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>StayHub - Find Your Perfect Stay</title>
+
+    <link rel="stylesheet" href="/static/public/public.css">
+</head>
+
+<body>
+
+<!-- ================= HEADER ================= -->
+
+<header class="header">
+
+    <div class="container header-inner">
+
+        <a href="/" class="logo">
+            <div class="logo-icon">S</div>
+
+            <div>
+                <strong>StayHub</strong>
+                <span>Hotels & Stays</span>
+            </div>
+        </a>
+
+        <nav class="main-nav">
+
+            <a href="#destinations">Destinations</a>
+
+            <a href="#properties">Hotels</a>
+
+            <a href="#about">About</a>
+
+            <a href="/static/public/owner-register.html"
+               class="list-property">
+                List Your Property
+            </a>
+
+            <a href="/static/public/login.html"
+               class="login-link">
+                Login
+            </a>
+
+        </nav>
+
+    </div>
+
+</header>
+
+
+<!-- ================= HERO ================= -->
+
+<section class="hero">
+
+    <div class="hero-overlay"></div>
+
+    <div class="container hero-content">
+
+        <div class="hero-text">
+
+            <span class="hero-badge">
+                ✦ Discover your next stay
+            </span>
+
+            <h1>
+                Find a place
+                <br>
+                you'll love to stay
+            </h1>
+
+            <p>
+                Search hotels, resorts and unique properties
+                across Pakistan and beyond.
+            </p>
+
+        </div>
+
+
+        <!-- SEARCH BOX -->
+
+        <div class="search-card">
+
+            <div class="search-field">
+
+                <label>Where are you going?</label>
+
+                <input
+                    type="text"
+                    id="destination"
+                    placeholder="City or hotel name"
+                >
+
+            </div>
+
+
+            <div class="search-field">
+
+                <label>Check-in</label>
+
+                <input
+                    type="date"
+                    id="check-in"
+                >
+
+            </div>
+
+
+            <div class="search-field">
+
+                <label>Check-out</label>
+
+                <input
+                    type="date"
+                    id="check-out"
+                >
+
+            </div>
+
+
+            <div class="search-field guests-field">
+
+                <label>Guests</label>
+
+                <select id="guests">
+
+                    <option value="1">
+                        1 Guest
+                    </option>
+
+                    <option value="2" selected>
+                        2 Guests
+                    </option>
+
+                    <option value="3">
+                        3 Guests
+                    </option>
+
+                    <option value="4">
+                        4 Guests
+                    </option>
+
+                    <option value="5">
+                        5 Guests
+                    </option>
+
+                    <option value="6">
+                        6 Guests
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <button
+                class="search-button"
+                onclick="searchHotels()"
+            >
+                🔍 Search
+            </button>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= POPULAR DESTINATIONS ================= -->
+
+<section
+    class="section"
+    id="destinations"
+>
+
+    <div class="container">
+
+        <div class="section-heading">
+
+            <div>
+
+                <span class="eyebrow">
+                    EXPLORE
+                </span>
+
+                <h2>
+                    Popular destinations
+                </h2>
+
+                <p>
+                    Discover great places to stay in Pakistan.
+                </p>
+
+            </div>
+
+            <button
+                class="text-button"
+                onclick="showAllDestinations()"
+            >
+                View all →
+            </button>
+
+        </div>
+
+
+        <div class="destination-grid">
+
+            <button
+                class="destination-card lahore"
+                onclick="searchCity('Lahore')"
+            >
+
+                <div class="destination-overlay"></div>
+
+                <div class="destination-content">
+
+                    <span>Pakistan</span>
+
+                    <h3>Lahore</h3>
+
+                    <small>
+                        Explore hotels →
+                    </small>
+
+                </div>
+
+            </button>
+
+
+            <button
+                class="destination-card islamabad"
+                onclick="searchCity('Islamabad')"
+            >
+
+                <div class="destination-overlay"></div>
+
+                <div class="destination-content">
+
+                    <span>Pakistan</span>
+
+                    <h3>Islamabad</h3>
+
+                    <small>
+                        Explore hotels →
+                    </small>
+
+                </div>
+
+            </button>
+
+
+            <button
+                class="destination-card karachi"
+                onclick="searchCity('Karachi')"
+            >
+
+                <div class="destination-overlay"></div>
+
+                <div class="destination-content">
+
+                    <span>Pakistan</span>
+
+                    <h3>Karachi</h3>
+
+                    <small>
+                        Explore hotels →
+                    </small>
+
+                </div>
+
+            </button>
+
+
+            <button
+                class="destination-card murree"
+                onclick="searchCity('Murree')"
+            >
+
+                <div class="destination-overlay"></div>
+
+                <div class="destination-content">
+
+                    <span>Pakistan</span>
+
+                    <h3>Murree</h3>
+
+                    <small>
+                        Explore hotels →
+                    </small>
+
+                </div>
+
+            </button>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= FEATURED PROPERTIES ================= -->
+
+<section
+    class="section properties-section"
+    id="properties"
+>
+
+    <div class="container">
+
+        <div class="section-heading">
+
+            <div>
+
+                <span class="eyebrow">
+                    STAYHUB
+                </span>
+
+                <h2>
+                    Featured properties
+                </h2>
+
+                <p>
+                    Hand-picked properties available on StayHub.
+                </p>
+
+            </div>
+
+            <button
+                class="text-button"
+                onclick="searchHotels()"
+            >
+                View all hotels →
+            </button>
+
+        </div>
+
+
+        <div
+            id="hotel-grid"
+            class="hotel-grid"
+        >
+
+            <!-- Hotels loaded by JavaScript -->
+
+        </div>
+
+
+        <div
+            id="hotel-loading"
+            class="loading"
+        >
+
+            Loading properties...
+
+        </div>
+
+
+        <div
+            id="hotel-empty"
+            class="empty-state hidden"
+        >
+
+            <div class="empty-icon">
+                🏨
+            </div>
+
+            <h3>
+                No properties found
+            </h3>
+
+            <p>
+                There are currently no approved properties
+                available for this search.
+            </p>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= LIST YOUR PROPERTY ================= -->
+
+<section class="owner-section">
+
+    <div class="container owner-inner">
+
+        <div>
+
+            <span class="eyebrow">
+                FOR PROPERTY OWNERS
+            </span>
+
+            <h2>
+                List your property on StayHub
+            </h2>
+
+            <p>
+                Reach more guests and manage your property,
+                rooms, rates and reservations from one place.
+            </p>
+
+            <a
+                href="/static/public/owner-register.html"
+                class="owner-button"
+            >
+                List Your Property →
+            </a>
+
+        </div>
+
+
+        <div class="owner-features">
+
+            <div>
+                <span>✓</span>
+                <p>Easy property registration</p>
+            </div>
+
+            <div>
+                <span>✓</span>
+                <p>Manage rooms and availability</p>
+            </div>
+
+            <div>
+                <span>✓</span>
+                <p>Receive and manage reservations</p>
+            </div>
+
+            <div>
+                <span>✓</span>
+                <p>Control rates and guest information</p>
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= HOW IT WORKS ================= -->
+
+<section
+    class="section"
+    id="about"
+>
+
+    <div class="container">
+
+        <div class="center-heading">
+
+            <span class="eyebrow">
+                HOW STAYHUB WORKS
+            </span>
+
+            <h2>
+                Book your stay in three simple steps
+            </h2>
+
+        </div>
+
+
+        <div class="steps">
+
+            <div class="step">
+
+                <div class="step-number">
+                    01
+                </div>
+
+                <h3>
+                    Search
+                </h3>
+
+                <p>
+                    Search by city, destination or hotel name
+                    and select your travel dates.
+                </p>
+
+            </div>
+
+
+            <div class="step">
+
+                <div class="step-number">
+                    02
+                </div>
+
+                <h3>
+                    Compare
+                </h3>
+
+                <p>
+                    Compare properties, rooms, prices,
+                    ratings and available facilities.
+                </p>
+
+            </div>
+
+
+            <div class="step">
+
+                <div class="step-number">
+                    03
+                </div>
+
+                <h3>
+                    Book
+                </h3>
+
+                <p>
+                    Select your room and complete your
+                    reservation.
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= FOOTER ================= -->
+
+<footer class="footer">
+
+    <div class="container footer-grid">
+
+        <div>
+
+            <div class="footer-logo">
+                <div class="logo-icon">S</div>
+
+                <strong>StayHub</strong>
+            </div>
+
+            <p>
+                Your trusted platform for discovering
+                and booking great places to stay.
+            </p>
+
+        </div>
+
+
+        <div>
+
+            <h4>
+                StayHub
+            </h4>
+
+            <a href="#about">
+                About
+            </a>
+
+            <a href="#properties">
+                Hotels
+            </a>
+
+            <a href="#destinations">
+                Destinations
+            </a>
+
+        </div>
+
+
+        <div>
+
+            <h4>
+                Property Owners
+            </h4>
+
+            <a href="/static/public/owner-register.html">
+                List Your Property
+            </a>
+
+            <a href="/static/public/login.html">
+                Owner Login
+            </a>
+
+        </div>
+
+
+        <div>
+
+            <h4>
+                Support
+            </h4>
+
+            <a href="#">
+                Help Center
+            </a>
+
+            <a href="#">
+                Contact Us
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <div class="footer-bottom">
+
+        <div class="container">
+
+            © 2026 StayHub. All rights reserved.
+
+        </div>
+
+    </div>
+
+</footer>
+
+
+<!-- ================= JAVASCRIPT ================= -->
+
+<script src="/static/public/public.js"></script>
+
+</body>
+</html>

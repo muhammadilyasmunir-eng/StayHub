@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>List Your Property - StayHub</title>
+<style>html,body{margin:0;width:100%;height:100%}iframe{border:0;width:100%;min-height:100vh;display:block}</style>
+</head>
+<body>
+<iframe id="registration" src="/static/public/owner-register-v5.html" title="StayHub Property Registration"></iframe>
+<script>
+const frame=document.getElementById('registration');
+frame.addEventListener('load',()=>{
+  const doc=frame.contentDocument;
+  if(!doc)return;
+  if(!doc.getElementById('stayhub-flow-client')){const s=doc.createElement('script');s.id='stayhub-flow-client';s.src='/static/public/owner-register-flow.js';s.async=false;doc.body.appendChild(s)}
+  if(!doc.getElementById('stayhub-submit-client')){const s=doc.createElement('script');s.id='stayhub-submit-client';s.src='/static/public/owner-register-submit-v2.js';s.async=false;doc.body.appendChild(s)}
+});
+</script>
+</body>
+</html>

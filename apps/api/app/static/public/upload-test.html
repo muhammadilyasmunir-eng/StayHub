@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>StayHub Upload Test</title>
+  <style>
+    body{font-family:Arial,sans-serif;max-width:620px;margin:50px auto;padding:24px;background:#f6f7f9}
+    .card{background:#fff;padding:28px;border-radius:12px;box-shadow:0 2px 14px #0001}
+    label{display:block;font-weight:600;margin:18px 0 8px}
+    input,button{box-sizing:border-box;width:100%;padding:12px;border:1px solid #ccd1d8;border-radius:7px}
+    button{margin-top:22px;background:#111827;color:white;border:0;cursor:pointer;font-weight:700}
+    button:disabled{opacity:.6;cursor:wait}
+    #result{margin-top:20px;padding:14px;border-radius:7px;white-space:pre-wrap;display:none}
+    .ok{background:#e8f7ed;color:#146c2e}.err{background:#fdecec;color:#9b1c1c}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>StayHub Upload Test</h1>
+    <p>This is an isolated test. The main property registration form is not used or changed.</p>
+    <form id="testForm">
+      <label for="message">Text</label>
+      <input id="message" name="message" type="text" placeholder="Enter test text" required>
+
+      <label for="photo">Photo</label>
+      <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required>
+
+      <button id="submitBtn" type="submit">Submit Test</button>
+    </form>
+    <div id="result"></div>
+  </div>
+<script>
+const form=document.getElementById('testForm');
+const button=document.getElementById('submitBtn');
+const result=document.getElementById('result');
+form.addEventListener('submit',async e=>{
+  e.preventDefault();
+  button.disabled=true;
+  button.textContent='Uploading and submitting...';
+  result.style.display='none';
+  result.className='';
+  try{
+    const response=await fetch('/upload-test',{method:'POST',body:new FormData(form)});
+    const data=await response.json();
+    if(!response.ok) throw new Error(data.detail||'Request failed.');
+    result.className='ok';
+    result.textContent='SUCCESS\n\n'+JSON.stringify(data,null,2);
+  }catch(error){
+    result.className='err';
+    result.textContent='ERROR\n\n'+error.message;
+  }finally{
+    result.style.display='block';
+    button.disabled=false;
+    button.textContent='Submit Test';
+  }
+});
+</script>
+</body>
+</html>

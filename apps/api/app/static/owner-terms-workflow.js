@@ -1,0 +1,1 @@
+(()=>{if(window.__stayhubOwnerVerificationV3)return;window.__stayhubOwnerVerificationV3=true;const s=document.createElement('script');s.src='/static/owner-verification-workflow-v2.js?v=3';s.defer=true;document.head.appendChild(s)})();
