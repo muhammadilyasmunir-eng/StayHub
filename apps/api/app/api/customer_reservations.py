@@ -98,7 +98,7 @@ def customer_reservation_messages(
         Notification.hotel_id == reservation.hotel_id,
     ).order_by(Notification.created_at.asc()).all()
     for n in notifications:
-        if any(key in (n.message or "") for key in (str(reservation.confirmation_no),)):
+        if str(reservation.confirmation_no) in (n.message or ""):
             events.append({"title": n.title, "message": n.message, "created_at": n.created_at})
 
     disputes = db.query(ReservationStatusDispute).filter(
@@ -114,7 +114,7 @@ def customer_reservation_messages(
             "created_at": d.resolved_at or d.created_at,
         })
 
-    events.sort(key=lambda x: x.get("created_at") or datetime.min.replace(tzinfo=timezone.utc))
+    events.sort(key=lambda x: str(x.get("created_at") or ""))
     db.commit()
     return {"reservation": result, "events": events}
 
