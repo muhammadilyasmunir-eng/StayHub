@@ -152,13 +152,16 @@ def create_dispute(
     db.add(dispute)
     db.flush()
 
+    guest_name = f"{reservation.guest.first_name} {reservation.guest.last_name}".strip() if reservation.guest else "Guest"
+    check_in = reservation.check_in.strftime("%d %b %Y")
+
     owner_id = reservation.hotel.owner_id if reservation.hotel else None
     if owner_id:
         db.add(Notification(
             user_id=owner_id,
             hotel_id=reservation.hotel_id,
             title="Guest disputed reservation status",
-            message=f"Reservation #{reservation.confirmation_no} was reported by the guest as incorrectly marked No-show. StayHub Admin will review the case.",
+            message=f"Reservation #{reservation.confirmation_no} • {guest_name} • Check-in: {check_in} • reported by the guest as incorrectly marked No-show. StayHub Admin will review the case.",
             type="reservation_status_dispute",
         ))
     admins = db.query(User).filter(User.role == UserRole.ADMIN).all()
@@ -167,7 +170,7 @@ def create_dispute(
             user_id=admin.id,
             hotel_id=reservation.hotel_id,
             title="Special Notice: Reservation Status Dispute",
-            message=f"Reservation #{reservation.confirmation_no}: guest reports that the property incorrectly marked this reservation as No-show. Please review the dispute.",
+            message=f"Reservation #{reservation.confirmation_no} • {guest_name} • Check-in: {check_in} • guest reports that the property incorrectly marked this reservation as No-show. Please review the dispute.",
             type="reservation_status_dispute",
         ))
     db.commit()
