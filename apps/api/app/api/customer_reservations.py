@@ -5,9 +5,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.dependencies import get_current_user, require_admin, require_customer
+from app.dependencies import require_admin, require_customer
 from app.models.guest import Guest
-from app.models.hotel import Hotel
 from app.models.notification import Notification
 from app.models.reservation import Reservation, ReservationStatus
 from app.models.reservation_status_dispute import ReservationStatusDispute, ReservationDisputeStatus
@@ -45,13 +44,22 @@ def _reservation_for_customer(db: Session, reservation_id: int, user: User) -> R
     return reservation
 
 
+def _reservation_payload(db: Session, reservation: Reservation):
+    commission = sync_commission_status(db, reservation)
+    data = serialize(reservation, commission_override=commission, db=db)
+    data["hotel_name"] = reservation.hotel.name if reservation.hotel else None
+    return data
+
+
 @router.get("/customer/reservations")
 def customer_reservations(
     db: Session = Depends(get_db), current_user: User = Depends(require_customer)
 ):
     guest = _guest_for_user(db, current_user)
     rows = db.query(Reservation).filter(Reservation.guest_id == guest.id).order_by(Reservation.created_at.desc()).all()
-    return [serialize(r, commission_override=sync_commission_status(db, r), db=db) for r in rows]
+    result = [_reservation_payload(db, r) for r in rows]
+    db.commit()
+    return result
 
 
 @router.get("/customer/reservations/{reservation_id}")
@@ -60,9 +68,55 @@ def customer_reservation_detail(
     db: Session = Depends(get_db), current_user: User = Depends(require_customer),
 ):
     reservation = _reservation_for_customer(db, reservation_id, current_user)
-    commission = sync_commission_status(db, reservation)
+    result = _reservation_payload(db, reservation)
     db.commit()
-    return serialize(reservation, commission_override=commission, db=db)
+    return result
+
+
+@router.get("/customer/reservations/by-confirmation/{confirmation_no}")
+def customer_reservation_messages(
+    confirmation_no: str,
+    db: Session = Depends(get_db), current_user: User = Depends(require_customer),
+):
+    guest = _guest_for_user(db, current_user)
+    reservation = db.query(Reservation).filter(
+        Reservation.confirmation_no == confirmation_no,
+        Reservation.guest_id == guest.id,
+    ).first()
+    if not reservation:
+        raise HTTPException(404, "Reservation not found")
+
+    result = _reservation_payload(db, reservation)
+    events = [{
+        "title": "Reservation created",
+        "message": f"Reservation #{reservation.confirmation_no} was received by StayHub.",
+        "created_at": reservation.created_at,
+    }]
+
+    notifications = db.query(Notification).filter(
+        Notification.user_id == current_user.id,
+        Notification.hotel_id == reservation.hotel_id,
+    ).order_by(Notification.created_at.asc()).all()
+    for n in notifications:
+        if any(key in (n.message or "") for key in (str(reservation.confirmation_no),)):
+            events.append({"title": n.title, "message": n.message, "created_at": n.created_at})
+
+    disputes = db.query(ReservationStatusDispute).filter(
+        ReservationStatusDispute.reservation_id == reservation.id,
+    ).order_by(ReservationStatusDispute.created_at.asc()).all()
+    for d in disputes:
+        events.append({
+            "title": "Status report submitted" if d.status == ReservationDisputeStatus.OPEN else "Status report reviewed",
+            "message": "Your incorrect-status report is under StayHub Admin review." if d.status == ReservationDisputeStatus.OPEN else (
+                "StayHub confirmed the reservation status was corrected to Confirmed." if d.status == ReservationDisputeStatus.RESOLVED_GUEST
+                else "StayHub reviewed the report and did not change the property status."
+            ),
+            "created_at": d.resolved_at or d.created_at,
+        })
+
+    events.sort(key=lambda x: x.get("created_at") or datetime.min.replace(tzinfo=timezone.utc))
+    db.commit()
+    return {"reservation": result, "events": events}
 
 
 @router.post("/customer/reservations/{reservation_id}/dispute")
