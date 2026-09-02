@@ -21,6 +21,7 @@ from app.api.finance import router as finance_router
 from app.api.destinations import router as destination_router
 from app.api.password_reset import router as password_reset_router
 from app.api.customer_reservations import router as customer_reservation_router
+from app.api.notifications import router as notification_router
 
 api_router = APIRouter()
 
@@ -31,5 +32,6 @@ for router in (
     admin_reservation_management_router, admin_verification_router, admin_terms_router,
     public_hotel_router, public_bookings_router if False else public_booking_router,
     public_booking_otp_router, finance_router, destination_router, password_reset_router,
+    notification_router,
 ):
     api_router.include_router(router)
