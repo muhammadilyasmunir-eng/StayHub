@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.dependencies import require_admin, require_customer
+from app.dependencies import require_admin, require_customer, require_hotel_owner
 from app.models.guest import Guest
 from app.models.notification import Notification
 from app.models.reservation import Reservation, ReservationStatus
@@ -22,7 +22,7 @@ class DisputeCreate(BaseModel):
 
 
 class DisputeResolve(BaseModel):
-    decision: str = Field(pattern="^(confirm_guest|reject)$")
+    decision: str = Field(pattern="^(confirm_guest|reject|close)$")
     note: str | None = Field(default=None, max_length=2000)
 
 
@@ -116,8 +116,10 @@ def customer_reservation_messages(
         events.append({
             "title": "Status report submitted" if d.status == ReservationDisputeStatus.OPEN else "Status report reviewed",
             "message": "Your incorrect-status report is under StayHub Admin review." if d.status == ReservationDisputeStatus.OPEN else (
-                "StayHub confirmed the reservation status was corrected to Confirmed." if d.status == ReservationDisputeStatus.RESOLVED_GUEST
-                else "StayHub reviewed the report and did not change the property status."
+                "The hotel owner verified that you stayed. StayHub Admin will close the dispute." if d.status == ReservationDisputeStatus.OWNER_VERIFIED else (
+                    "StayHub confirmed the reservation status was corrected to Confirmed." if d.status == ReservationDisputeStatus.RESOLVED_GUEST
+                    else "StayHub reviewed the report and did not change the property status."
+                )
             ),
             "created_at": d.resolved_at or d.created_at,
         })
@@ -178,6 +180,71 @@ def create_dispute(
     return {"message": "Your report has been sent to StayHub Admin for review.", "dispute_id": dispute.id, "status": dispute.status.value}
 
 
+@router.post("/owner/reservation-disputes/{dispute_id}/verify")
+def owner_verify_dispute(
+    dispute_id: int,
+    db: Session = Depends(get_db), current_user: User = Depends(require_hotel_owner),
+):
+    dispute = db.query(ReservationStatusDispute).filter(ReservationStatusDispute.id == dispute_id).first()
+    if not dispute:
+        raise HTTPException(404, "Dispute not found")
+    if dispute.status != ReservationDisputeStatus.OPEN:
+        raise HTTPException(400, "This dispute is no longer awaiting owner verification")
+
+    reservation = dispute.reservation
+    if not reservation.hotel or reservation.hotel.owner_id != current_user.id:
+        raise HTTPException(403, "This reservation does not belong to your property")
+    if reservation.status != ReservationStatus.NO_SHOW:
+        raise HTTPException(400, "Reservation is no longer marked No Show")
+
+    reservation.status = ReservationStatus.CONFIRMED
+    dispute.status = ReservationDisputeStatus.OWNER_VERIFIED
+    dispute.resolved_by = current_user.id
+    dispute.resolved_at = datetime.now(timezone.utc)
+
+    commission = sync_commission_status(db, reservation)
+    guest_name = f"{reservation.guest.first_name} {reservation.guest.last_name}".strip() if reservation.guest else "Guest"
+    message = f"Reservation #{reservation.confirmation_no} • {guest_name} was verified by the hotel owner as a genuine stay. The reservation is now Confirmed and applicable commission/revenue has been restored. StayHub Admin can close the dispute."
+
+    admins = db.query(User).filter(User.role == UserRole.ADMIN).all()
+    for admin in admins:
+        db.add(Notification(
+            user_id=admin.id,
+            hotel_id=reservation.hotel_id,
+            title="Reservation dispute verified by Owner",
+            message=message,
+            type="reservation_status_owner_verified",
+        ))
+
+    db.add(Notification(
+        user_id=current_user.id,
+        hotel_id=reservation.hotel_id,
+        title="Reservation dispute verified by Owner",
+        message=f"Reservation #{reservation.confirmation_no} was verified as a genuine stay. The reservation is Confirmed and applicable commission/revenue has been restored.",
+        type="reservation_status_owner_verified",
+        read=True,
+    ))
+
+    if reservation.guest and reservation.guest.email:
+        guest_user = db.query(User).filter(User.email.ilike(reservation.guest.email), User.role == UserRole.CUSTOMER).first()
+        if guest_user:
+            db.add(Notification(
+                user_id=guest_user.id,
+                hotel_id=reservation.hotel_id,
+                title="Your stay was verified by the hotel",
+                message=f"The hotel owner verified that you stayed for reservation #{reservation.confirmation_no}. StayHub Admin will now close the dispute.",
+                type="reservation_status_owner_verified",
+            ))
+
+    db.commit()
+    db.refresh(reservation)
+    return {
+        "message": "Reservation verified by owner. Commission and revenue have been synchronized.",
+        "reservation": serialize(reservation, commission_override=commission, db=db),
+        "dispute_status": dispute.status.value,
+    }
+
+
 @router.get("/admin/reservation-disputes")
 def admin_disputes(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     rows = db.query(ReservationStatusDispute).order_by(ReservationStatusDispute.created_at.desc()).all()
@@ -194,6 +261,7 @@ def admin_disputes(db: Session = Depends(get_db), current_user: User = Depends(r
             "original_status": d.original_status,
             "reason": d.guest_reason,
             "status": d.status.value,
+            "owner_verified": d.status == ReservationDisputeStatus.OWNER_VERIFIED,
             "admin_note": d.admin_note,
             "created_at": d.created_at,
             "resolved_at": d.resolved_at,
@@ -210,8 +278,40 @@ def resolve_dispute(
     dispute = db.query(ReservationStatusDispute).filter(ReservationStatusDispute.id == dispute_id).first()
     if not dispute:
         raise HTTPException(404, "Dispute not found")
+    if payload.decision == "close":
+        if dispute.status != ReservationDisputeStatus.OWNER_VERIFIED:
+            raise HTTPException(400, "Only an owner-verified dispute can be closed directly")
+        reservation = dispute.reservation
+        dispute.status = ReservationDisputeStatus.RESOLVED_GUEST
+        dispute.admin_note = payload.note.strip() if payload.note else "Closed by StayHub Admin after owner verification."
+        dispute.resolved_by = current_user.id
+        dispute.resolved_at = datetime.now(timezone.utc)
+        if reservation.guest and reservation.guest.email:
+            guest_user = db.query(User).filter(User.email.ilike(reservation.guest.email), User.role == UserRole.CUSTOMER).first()
+            if guest_user:
+                db.add(Notification(
+                    user_id=guest_user.id,
+                    hotel_id=reservation.hotel_id,
+                    title="Reservation dispute closed",
+                    message=f"StayHub Admin closed the dispute for reservation #{reservation.confirmation_no} after the hotel owner verified your stay.",
+                    type="reservation_status_owner_verified",
+                ))
+        owner_id = reservation.hotel.owner_id if reservation.hotel else None
+        if owner_id:
+            db.add(Notification(
+                user_id=owner_id,
+                hotel_id=reservation.hotel_id,
+                title="Reservation dispute closed",
+                message=f"StayHub Admin closed the dispute for reservation #{reservation.confirmation_no} after your owner verification.",
+                type="reservation_status_owner_verified",
+            ))
+        commission = sync_commission_status(db, reservation)
+        db.commit()
+        db.refresh(reservation)
+        return {"message": "Owner-verified dispute closed", "reservation": serialize(reservation, commission_override=commission, db=db), "dispute_status": dispute.status.value}
+
     if dispute.status != ReservationDisputeStatus.OPEN:
-        raise HTTPException(400, "This dispute has already been resolved")
+        raise HTTPException(400, "This dispute has already been reviewed by the owner or resolved")
 
     reservation = dispute.reservation
     owner_id = reservation.hotel.owner_id if reservation.hotel else None
