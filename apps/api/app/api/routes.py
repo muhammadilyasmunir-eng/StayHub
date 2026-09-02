@@ -20,12 +20,13 @@ from app.api.public_booking_otp import router as public_booking_otp_router
 from app.api.finance import router as finance_router
 from app.api.destinations import router as destination_router
 from app.api.password_reset import router as password_reset_router
+from app.api.customer_reservations import router as customer_reservation_router
 
 api_router = APIRouter()
 
 for router in (
     user_router, hotel_router, room_type_router, room_router, guest_router,
-    reservation_router, availability_router, upload_router, upload_test_router,
+    reservation_router, customer_reservation_router, availability_router, upload_router, upload_test_router,
     admin_hotel_router, admin_property_operations_router, admin_reservation_router,
     admin_reservation_management_router, admin_verification_router, admin_terms_router,
     public_hotel_router, public_bookings_router if False else public_booking_router,
