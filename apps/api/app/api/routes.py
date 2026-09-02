@@ -5,6 +5,7 @@ from app.api.room_type import router as room_type_router
 from app.api.room import router as room_router
 from app.api.guest import router as guest_router
 from app.api.reservation import router as reservation_router
+from app.api.owner_reservation_compat import router as owner_reservation_compat_router
 from app.api.availability import router as availability_router
 from app.api.uploads import router as upload_router
 from app.api.upload_test import router as upload_test_router
@@ -27,7 +28,7 @@ api_router = APIRouter()
 
 for router in (
     user_router, hotel_router, room_type_router, room_router, guest_router,
-    reservation_router, customer_reservation_router, availability_router, upload_router, upload_test_router,
+    reservation_router, owner_reservation_compat_router, customer_reservation_router, availability_router, upload_router, upload_test_router,
     admin_hotel_router, admin_property_operations_router, admin_reservation_router,
     admin_reservation_management_router, admin_verification_router, admin_terms_router,
     public_hotel_router, public_bookings_router if False else public_booking_router,
