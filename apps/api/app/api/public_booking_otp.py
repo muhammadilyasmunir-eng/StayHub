@@ -2,6 +2,9 @@ import os, secrets, smtplib, time
 from email.message import EmailMessage
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr, Field
+from app.db.session import SessionLocal
+from app.models.user import User, UserRole
+from app.core.security import create_access_token, hash_password
 
 router = APIRouter(prefix="/public/booking-otp", tags=["Public Booking OTP"])
 _CODES: dict[str, dict] = {}
@@ -40,8 +43,19 @@ def verify_otp(payload: OTPVerify):
     key=payload.email.lower(); record=_CODES.get(key)
     if not record or record["expires"]<time.time(): raise HTTPException(400,"Verification code expired. Please request a new code.")
     if not secrets.compare_digest(record["code"],payload.code): raise HTTPException(400,"Invalid verification code")
-    token=secrets.token_urlsafe(32); record["token"]=token; record["expires"]=time.time()+_TTL
-    return {"verified":True,"otp_token":token}
+    db=SessionLocal()
+    try:
+        user=db.query(User).filter(User.email.ilike(payload.email)).first()
+        if user is None:
+            user=User(email=payload.email.lower(),full_name=payload.email.split("@",1)[0],hashed_password=hash_password(secrets.token_urlsafe(32)),role=UserRole.CUSTOMER)
+            db.add(user); db.commit(); db.refresh(user)
+        elif user.role != UserRole.CUSTOMER:
+            raise HTTPException(403,"This email belongs to a non-customer account. Please use the appropriate portal login.")
+        token=create_access_token({"sub":user.email,"role":user.role.value})
+        record["token"]=token; record["expires"]=time.time()+_TTL
+        return {"verified":True,"access_token":token,"token_type":"bearer","role":"customer"}
+    finally:
+        db.close()
 
 def is_verified(email: str, token: str | None) -> bool:
     record=_CODES.get((email or "").lower())
