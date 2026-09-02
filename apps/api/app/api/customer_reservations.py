@@ -27,23 +27,12 @@ class DisputeResolve(BaseModel):
 
 
 def _guest_ids_for_user(db: Session, user: User) -> list[int]:
-    """Return every guest profile registered with the customer's email.
-
-    A guest can have multiple profiles when reservations were created separately.
-    Customer access is email-based, so all matching guest profiles must be included.
-    """
-    return [
-        guest.id
-        for guest in db.query(Guest).filter(Guest.email.ilike(user.email)).all()
-    ]
+    return [guest.id for guest in db.query(Guest).filter(Guest.email.ilike(user.email)).all()]
 
 
 def _reservation_for_customer(db: Session, reservation_id: int, user: User) -> Reservation:
     guest_ids = _guest_ids_for_user(db, user)
-    reservation = db.query(Reservation).filter(
-        Reservation.id == reservation_id,
-        Reservation.guest_id.in_(guest_ids),
-    ).first()
+    reservation = db.query(Reservation).filter(Reservation.id == reservation_id, Reservation.guest_id.in_(guest_ids)).first()
     if not reservation:
         raise HTTPException(404, "Reservation not found")
     return reservation
@@ -57,25 +46,18 @@ def _reservation_payload(db: Session, reservation: Reservation):
 
 
 @router.get("/customer/reservations")
-def customer_reservations(
-    db: Session = Depends(get_db), current_user: User = Depends(require_customer)
-):
+def customer_reservations(db: Session = Depends(get_db), current_user: User = Depends(require_customer)):
     guest_ids = _guest_ids_for_user(db, current_user)
     if not guest_ids:
         return []
-    rows = db.query(Reservation).filter(
-        Reservation.guest_id.in_(guest_ids)
-    ).order_by(Reservation.created_at.desc(), Reservation.id.desc()).all()
+    rows = db.query(Reservation).filter(Reservation.guest_id.in_(guest_ids)).order_by(Reservation.created_at.desc(), Reservation.id.desc()).all()
     result = [_reservation_payload(db, r) for r in rows]
     db.commit()
     return result
 
 
 @router.get("/customer/reservations/{reservation_id}")
-def customer_reservation_detail(
-    reservation_id: int,
-    db: Session = Depends(get_db), current_user: User = Depends(require_customer),
-):
+def customer_reservation_detail(reservation_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_customer)):
     reservation = _reservation_for_customer(db, reservation_id, current_user)
     result = _reservation_payload(db, reservation)
     db.commit()
@@ -83,114 +65,64 @@ def customer_reservation_detail(
 
 
 @router.get("/customer/reservations/by-confirmation/{confirmation_no}")
-def customer_reservation_messages(
-    confirmation_no: str, db: Session = Depends(get_db), current_user: User = Depends(require_customer),
-):
+def customer_reservation_messages(confirmation_no: str, db: Session = Depends(get_db), current_user: User = Depends(require_customer)):
     guest_ids = _guest_ids_for_user(db, current_user)
-    reservation = db.query(Reservation).filter(
-        Reservation.confirmation_no == confirmation_no,
-        Reservation.guest_id.in_(guest_ids),
-    ).first()
+    reservation = db.query(Reservation).filter(Reservation.confirmation_no == confirmation_no, Reservation.guest_id.in_(guest_ids)).first()
     if not reservation:
         raise HTTPException(404, "Reservation not found")
-
     result = _reservation_payload(db, reservation)
-    events = [{
-        "title": "Reservation created",
-        "message": f"Reservation #{reservation.confirmation_no} was received by StayHub.",
-        "created_at": reservation.created_at,
-    }]
-
-    notifications = db.query(Notification).filter(
-        Notification.user_id == current_user.id,
-        Notification.hotel_id == reservation.hotel_id,
-    ).order_by(Notification.created_at.asc()).all()
+    events = [{"title": "Reservation created", "message": f"Reservation #{reservation.confirmation_no} was received by StayHub.", "created_at": reservation.created_at}]
+    notifications = db.query(Notification).filter(Notification.user_id == current_user.id, Notification.hotel_id == reservation.hotel_id).order_by(Notification.created_at.asc()).all()
     for n in notifications:
         if str(reservation.confirmation_no) in (n.message or ""):
             events.append({"title": n.title, "message": n.message, "created_at": n.created_at})
-
-    disputes = db.query(ReservationStatusDispute).filter(
-        ReservationStatusDispute.reservation_id == reservation.id,
-    ).order_by(ReservationStatusDispute.created_at.asc()).all()
+    disputes = db.query(ReservationStatusDispute).filter(ReservationStatusDispute.reservation_id == reservation.id).order_by(ReservationStatusDispute.created_at.asc()).all()
     for d in disputes:
         events.append({
             "title": "Status report submitted" if d.status == ReservationDisputeStatus.OPEN else "Status report reviewed",
             "message": "Your incorrect-status report is under StayHub Admin review." if d.status == ReservationDisputeStatus.OPEN else (
                 "The hotel owner verified that you stayed. StayHub Admin will close the dispute." if d.status == ReservationDisputeStatus.OWNER_VERIFIED else (
-                    "StayHub confirmed the reservation status was corrected to Confirmed." if d.status == ReservationDisputeStatus.RESOLVED_GUEST
-                    else "StayHub reviewed the report and did not change the property status."
+                    "StayHub confirmed the reservation status was corrected to Confirmed." if d.status == ReservationDisputeStatus.RESOLVED_GUEST else "StayHub reviewed the report and did not change the property status."
                 )
             ),
             "created_at": d.resolved_at or d.created_at,
         })
-
     events.sort(key=lambda x: str(x.get("created_at") or ""))
     db.commit()
     return {"reservation": result, "events": events}
 
 
 @router.post("/customer/reservations/{reservation_id}/dispute")
-def create_dispute(
-    reservation_id: int,
-    payload: DisputeCreate,
-    db: Session = Depends(get_db), current_user: User = Depends(require_customer),
-):
+def create_dispute(reservation_id: int, payload: DisputeCreate, db: Session = Depends(get_db), current_user: User = Depends(require_customer)):
     reservation = _reservation_for_customer(db, reservation_id, current_user)
     if reservation.status != ReservationStatus.NO_SHOW:
         raise HTTPException(400, "Only a reservation marked No Show can be reported as incorrect")
-    existing = db.query(ReservationStatusDispute).filter(
-        ReservationStatusDispute.reservation_id == reservation.id,
-        ReservationStatusDispute.status == ReservationDisputeStatus.OPEN,
-    ).first()
+    existing = db.query(ReservationStatusDispute).filter(ReservationStatusDispute.reservation_id == reservation.id, ReservationStatusDispute.status == ReservationDisputeStatus.OPEN).first()
     if existing:
         raise HTTPException(409, "An incorrect-status report is already under review")
-
-    dispute = ReservationStatusDispute(
-        reservation_id=reservation.id,
-        guest_id=reservation.guest_id,
-        original_status=reservation.status.value,
-        guest_reason=payload.reason.strip(),
-    )
+    dispute = ReservationStatusDispute(reservation_id=reservation.id, guest_id=reservation.guest_id, original_status=reservation.status.value, guest_reason=payload.reason.strip())
     db.add(dispute)
     db.flush()
-
     guest_name = f"{reservation.guest.first_name} {reservation.guest.last_name}".strip() if reservation.guest else "Guest"
     check_in = reservation.check_in.strftime("%d %b %Y")
-
     owner_id = reservation.hotel.owner_id if reservation.hotel else None
     if owner_id:
-        db.add(Notification(
-            user_id=owner_id,
-            hotel_id=reservation.hotel_id,
-            title="Guest disputed reservation status",
-            message=f"Reservation #{reservation.confirmation_no} • {guest_name} • Check-in: {check_in} • reported by the guest as incorrectly marked No-show. StayHub Admin will review the case.",
-            type="reservation_status_dispute",
-        ))
+        db.add(Notification(user_id=owner_id, hotel_id=reservation.hotel_id, title="Guest disputed reservation status", message=f"Reservation #{reservation.confirmation_no} • {guest_name} • Check-in: {check_in} • reported by the guest as incorrectly marked No-show. StayHub Admin will review the case.", type="reservation_status_dispute"))
     admins = db.query(User).filter(User.role == UserRole.ADMIN).all()
     for admin in admins:
-        db.add(Notification(
-            user_id=admin.id,
-            hotel_id=reservation.hotel_id,
-            title="Special Notice: Reservation Status Dispute",
-            message=f"Reservation #{reservation.confirmation_no} • {guest_name} • Check-in: {check_in} • guest reports that the property incorrectly marked this reservation as No-show. Please review the dispute.",
-            type="reservation_status_dispute",
-        ))
+        db.add(Notification(user_id=admin.id, hotel_id=reservation.hotel_id, title="Special Notice: Reservation Status Dispute", message=f"Reservation #{reservation.confirmation_no} • {guest_name} • Check-in: {check_in} • guest reports that the property incorrectly marked this reservation as No-show. Please review the dispute.", type="reservation_status_dispute"))
     db.commit()
     db.refresh(dispute)
     return {"message": "Your report has been sent to StayHub Admin for review.", "dispute_id": dispute.id, "status": dispute.status.value}
 
 
 @router.post("/owner/reservation-disputes/{dispute_id}/verify")
-def owner_verify_dispute(
-    dispute_id: int,
-    db: Session = Depends(get_db), current_user: User = Depends(require_hotel_owner),
-):
+def owner_verify_dispute(dispute_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_hotel_owner)):
     dispute = db.query(ReservationStatusDispute).filter(ReservationStatusDispute.id == dispute_id).first()
     if not dispute:
         raise HTTPException(404, "Dispute not found")
     if dispute.status != ReservationDisputeStatus.OPEN:
         raise HTTPException(400, "This dispute is no longer awaiting owner verification")
-
     reservation = dispute.reservation
     if not reservation.hotel or reservation.hotel.owner_id != current_user.id:
         raise HTTPException(403, "This reservation does not belong to your property")
@@ -201,48 +133,28 @@ def owner_verify_dispute(
     dispute.status = ReservationDisputeStatus.OWNER_VERIFIED
     dispute.resolved_by = current_user.id
     dispute.resolved_at = datetime.now(timezone.utc)
-
     commission = sync_commission_status(db, reservation)
     guest_name = f"{reservation.guest.first_name} {reservation.guest.last_name}".strip() if reservation.guest else "Guest"
     message = f"Reservation #{reservation.confirmation_no} • {guest_name} was verified by the hotel owner as a genuine stay. The reservation is now Confirmed and applicable commission/revenue has been restored. StayHub Admin can close the dispute."
 
+    owner_notice = db.query(Notification).filter(Notification.user_id == current_user.id, Notification.hotel_id == reservation.hotel_id, Notification.type == "reservation_status_dispute", Notification.message.like(f"%Reservation #{reservation.confirmation_no}%")).order_by(Notification.created_at.desc()).first()
+    if owner_notice:
+        owner_notice.title = "Reservation dispute verified by Owner"
+        owner_notice.message = message
+        owner_notice.type = "reservation_status_owner_verified"
+        owner_notice.read = True
+
     admins = db.query(User).filter(User.role == UserRole.ADMIN).all()
     for admin in admins:
-        db.add(Notification(
-            user_id=admin.id,
-            hotel_id=reservation.hotel_id,
-            title="Reservation dispute verified by Owner",
-            message=message,
-            type="reservation_status_owner_verified",
-        ))
-
-    db.add(Notification(
-        user_id=current_user.id,
-        hotel_id=reservation.hotel_id,
-        title="Reservation dispute verified by Owner",
-        message=f"Reservation #{reservation.confirmation_no} was verified as a genuine stay. The reservation is Confirmed and applicable commission/revenue has been restored.",
-        type="reservation_status_owner_verified",
-        read=True,
-    ))
-
+        db.add(Notification(user_id=admin.id, hotel_id=reservation.hotel_id, title="Reservation dispute verified by Owner", message=message, type="reservation_status_owner_verified"))
+    db.add(Notification(user_id=current_user.id, hotel_id=reservation.hotel_id, title="Reservation dispute verified by Owner", message=f"Reservation #{reservation.confirmation_no} was verified as a genuine stay. The reservation is Confirmed and applicable commission/revenue has been restored.", type="reservation_status_owner_verified", read=True))
     if reservation.guest and reservation.guest.email:
         guest_user = db.query(User).filter(User.email.ilike(reservation.guest.email), User.role == UserRole.CUSTOMER).first()
         if guest_user:
-            db.add(Notification(
-                user_id=guest_user.id,
-                hotel_id=reservation.hotel_id,
-                title="Your stay was verified by the hotel",
-                message=f"The hotel owner verified that you stayed for reservation #{reservation.confirmation_no}. StayHub Admin will now close the dispute.",
-                type="reservation_status_owner_verified",
-            ))
-
+            db.add(Notification(user_id=guest_user.id, hotel_id=reservation.hotel_id, title="Your stay was verified by the hotel", message=f"The hotel owner verified that you stayed for reservation #{reservation.confirmation_no}. StayHub Admin will now close the dispute.", type="reservation_status_owner_verified"))
     db.commit()
     db.refresh(reservation)
-    return {
-        "message": "Reservation verified by owner. Commission and revenue have been synchronized.",
-        "reservation": serialize(reservation, commission_override=commission, db=db),
-        "dispute_status": dispute.status.value,
-    }
+    return {"message": "Reservation verified by owner. Commission and revenue have been synchronized.", "reservation": serialize(reservation, commission_override=commission, db=db), "dispute_status": dispute.status.value}
 
 
 @router.get("/admin/reservation-disputes")
@@ -251,33 +163,16 @@ def admin_disputes(db: Session = Depends(get_db), current_user: User = Depends(r
     result = []
     for d in rows:
         r = d.reservation
-        result.append({
-            "id": d.id,
-            "reservation_id": r.id,
-            "confirmation_no": r.confirmation_no,
-            "property": r.hotel.name if r.hotel else None,
-            "guest_name": f"{d.guest.first_name} {d.guest.last_name}".strip() if d.guest else None,
-            "guest_email": d.guest.email if d.guest else None,
-            "original_status": d.original_status,
-            "reason": d.guest_reason,
-            "status": d.status.value,
-            "owner_verified": d.status == ReservationDisputeStatus.OWNER_VERIFIED,
-            "admin_note": d.admin_note,
-            "created_at": d.created_at,
-            "resolved_at": d.resolved_at,
-        })
+        result.append({"id": d.id, "reservation_id": r.id, "confirmation_no": r.confirmation_no, "property": r.hotel.name if r.hotel else None, "guest_name": f"{d.guest.first_name} {d.guest.last_name}".strip() if d.guest else None, "guest_email": d.guest.email if d.guest else None, "original_status": d.original_status, "reason": d.guest_reason, "status": d.status.value, "owner_verified": d.status == ReservationDisputeStatus.OWNER_VERIFIED, "admin_note": d.admin_note, "created_at": d.created_at, "resolved_at": d.resolved_at})
     return result
 
 
 @router.post("/admin/reservation-disputes/{dispute_id}/resolve")
-def resolve_dispute(
-    dispute_id: int,
-    payload: DisputeResolve,
-    db: Session = Depends(get_db), current_user: User = Depends(require_admin),
-):
+def resolve_dispute(dispute_id: int, payload: DisputeResolve, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     dispute = db.query(ReservationStatusDispute).filter(ReservationStatusDispute.id == dispute_id).first()
     if not dispute:
         raise HTTPException(404, "Dispute not found")
+
     if payload.decision == "close":
         if dispute.status != ReservationDisputeStatus.OWNER_VERIFIED:
             raise HTTPException(400, "Only an owner-verified dispute can be closed directly")
@@ -289,22 +184,10 @@ def resolve_dispute(
         if reservation.guest and reservation.guest.email:
             guest_user = db.query(User).filter(User.email.ilike(reservation.guest.email), User.role == UserRole.CUSTOMER).first()
             if guest_user:
-                db.add(Notification(
-                    user_id=guest_user.id,
-                    hotel_id=reservation.hotel_id,
-                    title="Reservation dispute closed",
-                    message=f"StayHub Admin closed the dispute for reservation #{reservation.confirmation_no} after the hotel owner verified your stay.",
-                    type="reservation_status_owner_verified",
-                ))
+                db.add(Notification(user_id=guest_user.id, hotel_id=reservation.hotel_id, title="Reservation dispute closed", message=f"StayHub Admin closed the dispute for reservation #{reservation.confirmation_no} after the hotel owner verified your stay.", type="reservation_status_owner_verified"))
         owner_id = reservation.hotel.owner_id if reservation.hotel else None
         if owner_id:
-            db.add(Notification(
-                user_id=owner_id,
-                hotel_id=reservation.hotel_id,
-                title="Reservation dispute closed",
-                message=f"StayHub Admin closed the dispute for reservation #{reservation.confirmation_no} after your owner verification.",
-                type="reservation_status_owner_verified",
-            ))
+            db.add(Notification(user_id=owner_id, hotel_id=reservation.hotel_id, title="Reservation dispute closed", message=f"StayHub Admin closed the dispute for reservation #{reservation.confirmation_no} after your owner verification.", type="reservation_status_owner_verified"))
         commission = sync_commission_status(db, reservation)
         db.commit()
         db.refresh(reservation)
@@ -312,7 +195,6 @@ def resolve_dispute(
 
     if dispute.status != ReservationDisputeStatus.OPEN:
         raise HTTPException(400, "This dispute has already been reviewed by the owner or resolved")
-
     reservation = dispute.reservation
     owner_id = reservation.hotel.owner_id if reservation.hotel else None
     if payload.decision == "confirm_guest":
@@ -336,7 +218,6 @@ def resolve_dispute(
         if owner_id:
             db.add(Notification(user_id=owner_id, hotel_id=reservation.hotel_id, title=title, message=message, type="reservation_status_reviewed"))
         commission = sync_commission_status(db, reservation)
-
     dispute.admin_note = payload.note.strip() if payload.note else None
     dispute.resolved_by = current_user.id
     dispute.resolved_at = datetime.now(timezone.utc)
