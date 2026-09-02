@@ -9,6 +9,7 @@ from app.db.base import Base
 
 class ReservationDisputeStatus(str, Enum):
     OPEN = "Open"
+    OWNER_VERIFIED = "Verified by Owner"
     RESOLVED_GUEST = "Resolved - Guest Correct"
     REJECTED = "Rejected"
 
