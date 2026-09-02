@@ -25,11 +25,7 @@ def _reservation_daily_rates(db:Session,reservation):
     return build_daily_rate_breakdown(reservation.check_in,reservation.check_out,rows,Decimal(str(room_type.discount_percent or 0)),Decimal(str(hotel.tax_percent or 0)))
 
 def _property_policy_data(hotel):
-    """Expose the property's saved List Your Property policy data to reservation details.
-
-    Empty/unconfigured policy values intentionally remain None so the reservation UI
-    can render the single consistent fallback label: Not specified.
-    """
+    """Expose the property's saved List Your Property policy data to reservation details."""
     policy=getattr(hotel,"policy",None) if hotel else None
     cancellation=getattr(policy,"cancellation_policy",None) if policy else None
     child=getattr(policy,"child_policy",None) if policy else None
@@ -62,6 +58,32 @@ def _property_policy_data(hotel):
         "house_rules": getattr(policy,"house_rules",None) if policy else None,
     }
 
+def _reservation_facilities(room_type,hotel):
+    """Return the currently saved room/property facilities and breakfast options.
+
+    Reservation rows currently do not contain an amenities snapshot, so this exposes
+    the active List Your Property / room-type data without inventing booking details.
+    """
+    names=[]
+    for facility in (getattr(room_type,"facilities",[]) if room_type else []):
+        if getattr(facility,"available",True) and getattr(facility,"name",None):
+            names.append(str(facility.name).strip())
+    for facility in (getattr(hotel,"facilities",[]) if hotel else []):
+        if getattr(facility,"available",True) and getattr(facility,"name",None):
+            names.append(str(facility.name).strip())
+    unique=[]
+    seen=set()
+    for name in names:
+        key=name.casefold()
+        if name and key not in seen:
+            seen.add(key); unique.append(name)
+    meals=[]
+    for value in (getattr(hotel,"breakfast_options",[]) if hotel else []):
+        if value and str(value).strip(): meals.append(str(value).strip())
+    other=getattr(hotel,"breakfast_other",None) if hotel else None
+    if other and str(other).strip(): meals.append(str(other).strip())
+    return unique, list(dict.fromkeys(meals))
+
 def serialize(reservation,commission_override=None,db=None):
     commission=commission_override if commission_override is not None else reservation.commission
     if reservation.status==ReservationStatus.NO_SHOW and commission and commission.status=="NO_SHOW_WAIVED":
@@ -73,8 +95,8 @@ def serialize(reservation,commission_override=None,db=None):
     if room_type and getattr(room_type,"photos",None):
         photos=sorted(room_type.photos,key=lambda p:(not bool(p.is_primary),int(p.sort_order or 0),int(p.id or 0)))
         if photos: primary_photo=photos[0].photo_url
-    hotel=reservation.hotel; policy_data=_property_policy_data(hotel); no_show_allowed=can_owner_mark_no_show(hotel,reservation) if hotel else False; modification_allowed=can_owner_modify_dates(hotel,reservation) if hotel else False; no_show_start,no_show_end=no_show_window(hotel,reservation) if hotel else (None,None)
-    return {"id":reservation.id,"hotel_id":reservation.hotel_id,"guest_id":reservation.guest_id,"room_id":reservation.room_id,"confirmation_no":reservation.confirmation_no,"booking_number":reservation.confirmation_no,"booking_source":reservation.booking_source.value,"check_in":reservation.check_in,"check_out":reservation.check_out,"created_at":reservation.created_at,"received_at":reservation.created_at,"adults":reservation.adults,"children":reservation.children,"room_rate":reservation.room_rate,"discount":reservation.discount,"tax":reservation.tax,"total_amount":reservation.total_amount,"commissionable_amount":commissionable_amount,"status":reservation.status.value,"remarks":reservation.remarks,"payment_method":reservation.payment_method,"property_payment_method":policy_data["property_payment_method"],"payment_status":reservation.payment_status,"payment_reference":reservation.payment_reference,"card_last4":reservation.card_last4,"guest_name":f"{guest.first_name} {guest.last_name}".strip() if guest else None,"guest_phone":guest.phone if guest else None,"guest_email":guest.email if guest else None,"guest_city":guest.city if guest else None,"guest_country":guest.country if guest else None,"guest_nationality":guest.nationality if guest else None,"room_number":room.room_number if room else None,"room_type_id":room_type.id if room_type else None,"room_type_name":room_type.name if room_type else None,"room_description":room_type.description if room_type else None,"room_bed_type":room_type.bed_type if room_type else None,"room_size":room_type.room_size if room_type else None,"max_adults":room_type.max_adults if room_type else None,"max_children":room_type.max_children if room_type else None,"room_photo_url":primary_photo,"included_value_adds":[],"meal_options":[],"total_units":1,"daily_rates":daily_rates,"commission_percent":commission.commission_percent if commission else None,"commission_amount":commission_amount,"owner_amount":owner_amount,"commission_status":commission_status,"no_show_allowed":no_show_allowed,"no_show_start_at":no_show_start,"no_show_end_at":no_show_end,"modification_allowed":modification_allowed,**policy_data}
+    hotel=reservation.hotel; policy_data=_property_policy_data(hotel); included_value_adds,meal_options=_reservation_facilities(room_type,hotel); no_show_allowed=can_owner_mark_no_show(hotel,reservation) if hotel else False; modification_allowed=can_owner_modify_dates(hotel,reservation) if hotel else False; no_show_start,no_show_end=no_show_window(hotel,reservation) if hotel else (None,None)
+    return {"id":reservation.id,"hotel_id":reservation.hotel_id,"guest_id":reservation.guest_id,"room_id":reservation.room_id,"confirmation_no":reservation.confirmation_no,"booking_number":reservation.confirmation_no,"booking_source":reservation.booking_source.value,"check_in":reservation.check_in,"check_out":reservation.check_out,"created_at":reservation.created_at,"received_at":reservation.created_at,"adults":reservation.adults,"children":reservation.children,"room_rate":reservation.room_rate,"discount":reservation.discount,"tax":reservation.tax,"total_amount":reservation.total_amount,"commissionable_amount":commissionable_amount,"status":reservation.status.value,"remarks":reservation.remarks,"payment_method":reservation.payment_method,"property_payment_method":policy_data["property_payment_method"],"payment_status":reservation.payment_status,"payment_reference":reservation.payment_reference,"card_last4":reservation.card_last4,"guest_name":f"{guest.first_name} {guest.last_name}".strip() if guest else None,"guest_phone":guest.phone if guest else None,"guest_email":guest.email if guest else None,"guest_city":guest.city if guest else None,"guest_country":guest.country if guest else None,"guest_nationality":guest.nationality if guest else None,"room_number":room.room_number if room else None,"room_type_id":room_type.id if room_type else None,"room_type_name":room_type.name if room_type else None,"room_description":room_type.description if room_type else None,"room_bed_type":room_type.bed_type if room_type else None,"room_size":room_type.room_size if room_type else None,"max_adults":room_type.max_adults if room_type else None,"max_children":room_type.max_children if room_type else None,"room_photo_url":primary_photo,"included_value_adds":included_value_adds,"meal_options":meal_options,"total_units":1,"daily_rates":daily_rates,"commission_percent":commission.commission_percent if commission else None,"commission_amount":commission_amount,"owner_amount":owner_amount,"commission_status":commission_status,"no_show_allowed":no_show_allowed,"no_show_start_at":no_show_start,"no_show_end_at":no_show_end,"modification_allowed":modification_allowed,**policy_data}
 
 @router.post("/hotel/{hotel_id}",status_code=status.HTTP_201_CREATED)
 def create(hotel_id:int,reservation:ReservationCreate,db:Session=Depends(get_db)):
