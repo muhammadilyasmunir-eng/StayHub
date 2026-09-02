@@ -14,6 +14,15 @@ def test_owner_portal_message_workspace_is_loaded():
     assert "/reservations/hotel/" in js
 
 
+def test_owner_notifications_are_clickable_and_persist_in_messages_history():
+    js = (STATIC / "owner-notification-center.js").read_text(encoding="utf-8")
+    assert "data-notification-id" in js
+    assert "openNotification" in js
+    assert "systemNotifications" in js
+    assert "System notification" in js
+    assert "for(const n of fresh)fetch" not in js
+
+
 def test_admin_portal_message_workspace_uses_admin_session():
     main = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
     js = (STATIC / "admin-reservation-disputes.js").read_text(encoding="utf-8")
