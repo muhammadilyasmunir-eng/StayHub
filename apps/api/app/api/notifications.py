@@ -77,6 +77,7 @@ def list_notifications(db: Session = Depends(get_db), current_user: User = Depen
             hotel_cache[hotel_id] = db.query(Hotel).filter(Hotel.id == hotel_id).first() if hotel_id else None
         hotel = hotel_cache[hotel_id]
         dispute_id = None
+        dispute_status = None
         if reservation:
             if reservation.id not in dispute_cache:
                 dispute_cache[reservation.id] = db.query(ReservationStatusDispute).filter(
@@ -84,6 +85,7 @@ def list_notifications(db: Session = Depends(get_db), current_user: User = Depen
                 ).order_by(ReservationStatusDispute.created_at.desc()).first()
             dispute = dispute_cache[reservation.id]
             dispute_id = dispute.id if dispute else None
+            dispute_status = dispute.status.value if dispute else None
         result.append({
             "id": n.id,
             "title": n.title,
@@ -96,6 +98,7 @@ def list_notifications(db: Session = Depends(get_db), current_user: User = Depen
             "hotel_id": hotel_id,
             "hotel_name": hotel.name if hotel else None,
             "dispute_id": dispute_id,
+            "dispute_status": dispute_status,
         })
     return result
 
