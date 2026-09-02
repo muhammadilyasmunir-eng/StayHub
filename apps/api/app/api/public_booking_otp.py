@@ -9,6 +9,7 @@ from app.core.security import create_access_token, hash_password
 router = APIRouter(prefix="/public/booking-otp", tags=["Public Booking OTP"])
 _CODES: dict[str, dict] = {}
 _TTL = 600
+CUSTOMER_SESSION_MINUTES = 525600  # 365 days; customer remains logged in until explicit logout.
 
 class OTPRequest(BaseModel):
     email: EmailStr
@@ -51,10 +52,10 @@ def verify_otp(payload: OTPVerify):
             db.add(user); db.commit(); db.refresh(user)
         elif user.role != UserRole.CUSTOMER:
             raise HTTPException(403,"This email belongs to a non-customer account. Please use the appropriate portal login.")
-        access_token=create_access_token({"sub":user.email,"role":user.role.value})
+        access_token=create_access_token({"sub":user.email,"role":user.role.value}, expires_minutes=CUSTOMER_SESSION_MINUTES)
         otp_token=secrets.token_urlsafe(32)
         record["token"]=otp_token; record["expires"]=time.time()+_TTL
-        return {"verified":True,"access_token":access_token,"otp_token":otp_token,"token_type":"bearer","role":"customer"}
+        return {"verified":True,"access_token":access_token,"otp_token":otp_token,"token_type":"bearer","role":"customer","session_days":365}
     finally:
         db.close()
 
