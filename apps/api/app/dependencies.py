@@ -87,14 +87,35 @@ def require_hotel_owner(
 
 
 def require_customer(
-    current_user: User = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
 ) -> User:
+    """Authorize a customer session without changing the user's primary role.
 
-    if current_user.role != UserRole.CUSTOMER:
-
+    Customer OTP is a separate session context. This is important when the same
+    email is also registered as a hotel owner: the database User remains
+    HOTEL_OWNER, while the OTP JWT explicitly carries role=customer. Reservation
+    ownership is still restricted by the authenticated email in customer routes.
+    """
+    payload = decode_access_token(token)
+    if payload is None or payload.get("role") != UserRole.CUSTOMER.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Customer access required",
         )
 
-    return current_user
+    email = payload.get("sub")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate customer credentials",
+        )
+
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Customer account not found",
+        )
+
+    return user
