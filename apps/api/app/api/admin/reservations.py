@@ -19,10 +19,14 @@ def serialize(reservation, commission=None):
     room = reservation.room
     room_type = room.room_type if room else None
     commission = commission or reservation.commission
+    owner = reservation.hotel.owner if reservation.hotel else None
     return {
         "id": reservation.id,
         "hotel_id": reservation.hotel_id,
         "hotel_name": reservation.hotel.name if reservation.hotel else None,
+        "owner_user_id": owner.id if owner else None,
+        "owner_name": owner.full_name if owner else None,
+        "owner_email": owner.email if owner else None,
         "guest_id": reservation.guest_id,
         "guest_name": f"{guest.first_name} {guest.last_name}".strip() if guest else None,
         "guest_phone": guest.phone if guest else None,
