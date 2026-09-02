@@ -50,9 +50,10 @@ def verify_otp(payload: OTPVerify):
         if user is None:
             user=User(email=payload.email.lower(),full_name=payload.email.split("@",1)[0],hashed_password=hash_password(secrets.token_urlsafe(32)),role=UserRole.CUSTOMER)
             db.add(user); db.commit(); db.refresh(user)
-        elif user.role != UserRole.CUSTOMER:
-            raise HTTPException(403,"This email belongs to a non-customer account. Please use the appropriate portal login.")
-        access_token=create_access_token({"sub":user.email,"role":user.role.value}, expires_minutes=CUSTOMER_SESSION_MINUTES)
+        # Do not reject an existing owner/admin email here. Customer OTP authentication
+        # is a separate session context identified by the JWT role below. This allows a
+        # guest to access reservations made with the same email used by a property owner.
+        access_token=create_access_token({"sub":user.email,"role":UserRole.CUSTOMER.value}, expires_minutes=CUSTOMER_SESSION_MINUTES)
         otp_token=secrets.token_urlsafe(32)
         record["token"]=otp_token; record["expires"]=time.time()+_TTL
         return {"verified":True,"access_token":access_token,"otp_token":otp_token,"token_type":"bearer","role":"customer","session_minutes":60}
