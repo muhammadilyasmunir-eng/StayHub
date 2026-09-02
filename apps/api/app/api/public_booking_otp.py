@@ -9,7 +9,7 @@ from app.core.security import create_access_token, hash_password
 router = APIRouter(prefix="/public/booking-otp", tags=["Public Booking OTP"])
 _CODES: dict[str, dict] = {}
 _TTL = 600
-CUSTOMER_SESSION_MINUTES = 525600  # 365 days; customer remains logged in until explicit logout.
+CUSTOMER_SESSION_MINUTES = 60  # 1 hour; customer remains logged in until explicit logout or token expiry.
 
 class OTPRequest(BaseModel):
     email: EmailStr
@@ -55,7 +55,7 @@ def verify_otp(payload: OTPVerify):
         access_token=create_access_token({"sub":user.email,"role":user.role.value}, expires_minutes=CUSTOMER_SESSION_MINUTES)
         otp_token=secrets.token_urlsafe(32)
         record["token"]=otp_token; record["expires"]=time.time()+_TTL
-        return {"verified":True,"access_token":access_token,"otp_token":otp_token,"token_type":"bearer","role":"customer","session_days":365}
+        return {"verified":True,"access_token":access_token,"otp_token":otp_token,"token_type":"bearer","role":"customer","session_minutes":60}
     finally:
         db.close()
 
