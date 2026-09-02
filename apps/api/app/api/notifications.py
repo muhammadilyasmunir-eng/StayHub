@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -54,22 +55,39 @@ def _parse_message_type(value: str):
     except Exception:
         return None
 
+def _notification_reservation(db: Session, notification: Notification):
+    text = notification.message or ""
+    match = re.search(r"Reservation\s*#([A-Za-z0-9_-]+)", text, re.IGNORECASE)
+    if not match:
+        return None
+    return db.query(Reservation).filter(Reservation.confirmation_no == match.group(1)).first()
+
 @router.get("")
 def list_notifications(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     rows = db.query(Notification).filter(Notification.user_id == current_user.id).order_by(Notification.created_at.desc()).limit(100).all()
-    return [{"id":n.id,"title":n.title,"message":n.message,"type":n.type,"read":n.read,"created_at":n.created_at} for n in rows]
+    result = []
+    for n in rows:
+        reservation = _notification_reservation(db, n)
+        result.append({
+            "id": n.id,
+            "title": n.title,
+            "message": n.message,
+            "type": n.type,
+            "read": n.read,
+            "created_at": n.created_at,
+            "reservation_id": reservation.id if reservation else None,
+            "confirmation_no": reservation.confirmation_no if reservation else None,
+            "hotel_id": reservation.hotel_id if reservation else n.hotel_id,
+        })
+    return result
 
 @router.get("/contacts")
 def list_message_contacts(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Return only users the current portal is allowed to start a conversation with."""
     if current_user.role == UserRole.ADMIN:
         rows = db.query(User).filter(User.id != current_user.id, User.role.in_([UserRole.HOTEL_OWNER, UserRole.CUSTOMER])).order_by(User.full_name, User.id).all()
         return [{"id":u.id,"name":u.full_name,"email":u.email,"role":u.role.value} for u in rows]
     admins = db.query(User).filter(User.role == UserRole.ADMIN).order_by(User.id).all()
-    result = [{"id":u.id,"name":u.full_name or "StayHub Admin","email":u.email,"role":u.role.value} for u in admins]
-    if current_user.role == UserRole.HOTEL_OWNER:
-        return result
-    return result
+    return [{"id":u.id,"name":u.full_name or "StayHub Admin","email":u.email,"role":u.role.value} for u in admins]
 
 @router.get("/messages")
 def list_messages(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
