@@ -24,6 +24,7 @@ def ensure_schema():
         conn.execute(text("ALTER TABLE hotels ALTER COLUMN tax_percent DROP NOT NULL"))
         conn.execute(text("ALTER TABLE hotels ALTER COLUMN tax_percent DROP DEFAULT"))
         conn.execute(text("UPDATE hotels SET tax_percent=NULL WHERE tax_percent=0"))
+        conn.execute(text("DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_type WHERE typname='reservationdisputestatus') THEN ALTER TYPE reservationdisputestatus ADD VALUE IF NOT EXISTS 'OWNER_VERIFIED'; END IF; END $$"))
 
 DATE_DEFAULT_SCRIPT='<script src="/static/date-defaults.js?v=3"></script>'
 RESERVATION_MANAGEMENT_SCRIPT='<script src="/static/reservation-management-ui.js?v=2"></script>'
