@@ -16,11 +16,12 @@ from app.models.terms_acceptance import TermsDocument, HotelTermsAcceptance
 from app.models.notification import Notification
 from app.models.room_availability import RoomAvailability
 from app.models.password_reset import PasswordResetToken
+from app.models.guest_review import GuestReview
 
 __all__ = [
     "User", "Hotel", "HotelPhoto", "HotelDocument", "HotelPolicy", "HotelFacility",
     "RoomType", "RoomTypeFacility", "RoomTypePhoto", "Room", "Guest", "Reservation",
     "ReservationCommission", "ReservationStatusDispute", "ReservationDisputeStatus",
     "TermsDocument", "HotelTermsAcceptance", "Notification", "RoomAvailability",
-    "PasswordResetToken",
+    "PasswordResetToken", "GuestReview",
 ]
