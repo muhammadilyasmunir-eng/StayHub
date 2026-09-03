@@ -4,7 +4,6 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.dependencies import get_db, get_current_user
-from app.models.hotel import Hotel
 from app.models.room_type_photo import RoomTypePhoto
 from app.models.user import User
 from app.schemas.room_type import RoomTypeCreate, RoomTypeUpdate, RoomTypeResponse
@@ -37,13 +36,6 @@ def _validate_upload_count(existing: int, incoming: int) -> None:
         raise HTTPException(status_code=400, detail=f"Minimum {MIN_ROOM_PHOTOS} room photos are required for a new room category.")
     if existing + incoming > MAX_ROOM_PHOTOS:
         raise HTTPException(status_code=400, detail=f"Maximum {MAX_ROOM_PHOTOS} photos are allowed. This room category already has {existing} photo(s).")
-
-
-def _validate_image(file: UploadFile) -> tuple[str, bytes]:
-    extension = Path(file.filename or "").suffix.lower()
-    if extension not in IMAGE_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Only JPG, JPEG, PNG, WEBP and GIF images are allowed.")
-    return extension, None
 
 
 @router.post("/hotel/{hotel_id}", response_model=RoomTypeResponse, status_code=status.HTTP_201_CREATED)
@@ -128,16 +120,16 @@ async def replace_photo(room_type_id: int, photo_id: int, file: UploadFile = Fil
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="Each room photo must be 10 MB or smaller.")
     filename = f"{uuid4().hex}{extension}"
-    new_path = UPLOAD_ROOT / filename
     UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
-    new_path.write_bytes(content)
-    old_path = Path(str(photo.photo_url or "").split("/static/", 1)[-1]) if "/static/" in str(photo.photo_url) else None
+    (UPLOAD_ROOT / filename).write_bytes(content)
+    old_url = str(photo.photo_url or "")
     photo.photo_url = f"/static/uploads/room-types/{filename}"
     photo.caption = file.filename
     db.commit()
     db.refresh(photo)
-    if old_path:
-        old_file = UPLOAD_ROOT.parent.parent / old_path if not old_path.is_absolute() else old_path
+    if "/static/" in old_url:
+        old_relative = old_url.split("/static/", 1)[1]
+        old_file = Path("app/static") / old_relative
         try:
             old_file.unlink(missing_ok=True)
         except OSError:
