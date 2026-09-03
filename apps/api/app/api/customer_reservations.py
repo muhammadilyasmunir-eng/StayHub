@@ -37,12 +37,8 @@ def _reservation_payload(db: Session, reservation: Reservation):
     commission = sync_commission_status(db, reservation)
     data = serialize(reservation, commission_override=commission, db=db)
     data["hotel_name"] = reservation.hotel.name if reservation.hotel else None
-    data["incorrect_status_report_deadline"] = (
-        reservation.check_out + timedelta(days=10) if reservation.check_out else None
-    )
-    data["incorrect_status_report_expired"] = bool(
-        reservation.check_out and datetime.now(timezone.utc).replace(tzinfo=None) > reservation.check_out + timedelta(days=10)
-    )
+    data["incorrect_status_report_deadline"] = reservation.check_out + timedelta(days=10) if reservation.check_out else None
+    data["incorrect_status_report_expired"] = bool(reservation.check_out and datetime.now(timezone.utc).date() > reservation.check_out + timedelta(days=10))
     return data
 
 @router.get("/customer/reservations")
@@ -89,8 +85,7 @@ def create_dispute(reservation_id: int, payload: DisputeCreate, db: Session = De
     if not reservation.check_out:
         raise HTTPException(400, "This reservation has no check-out date, so the report deadline cannot be determined")
     deadline = reservation.check_out + timedelta(days=10)
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if now > deadline:
+    if datetime.now(timezone.utc).date() > deadline:
         raise HTTPException(400, "The 10-day time limit has expired. You had 10 days after check-out to report an incorrect reservation status.")
     existing = db.query(ReservationStatusDispute).filter(ReservationStatusDispute.reservation_id == reservation.id, ReservationStatusDispute.status == ReservationDisputeStatus.OPEN).first()
     if existing:
@@ -120,9 +115,7 @@ def owner_verify_dispute(dispute_id: int, db: Session = Depends(get_db), current
     reservation = dispute.reservation
     if not reservation.hotel or reservation.hotel.owner_id != current_user.id:
         raise HTTPException(403, "This reservation does not belong to your property")
-    deadline = dispute.created_at + timedelta(days=7) if dispute.created_at else None
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if deadline and now > deadline:
+    if dispute.created_at and datetime.now(timezone.utc) > dispute.created_at + timedelta(days=7):
         raise HTTPException(400, "The 7-day time limit has expired. You had 7 days to confirm that the guest stayed.")
     if reservation.status != ReservationStatus.NO_SHOW:
         raise HTTPException(400, "Reservation is no longer marked No Show")
