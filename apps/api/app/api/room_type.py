@@ -16,6 +16,8 @@ router = APIRouter(prefix="/room-types", tags=["Room Types"])
 UPLOAD_ROOT = Path("app/static/uploads/room-types")
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
+MIN_ROOM_PHOTOS = 3
+MAX_ROOM_PHOTOS = 10
 
 
 def _owner_room_type(db: Session, room_type_id: int, current_user: User):
@@ -26,6 +28,22 @@ def _owner_room_type(db: Session, room_type_id: int, current_user: User):
     if hotel is None or hotel.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Room type not found")
     return room_type
+
+
+def _validate_upload_count(existing: int, incoming: int) -> None:
+    if incoming < 1:
+        raise HTTPException(status_code=400, detail="At least 1 room photo must be selected.")
+    if existing == 0 and incoming < MIN_ROOM_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"Minimum {MIN_ROOM_PHOTOS} room photos are required for a new room category.")
+    if existing + incoming > MAX_ROOM_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"Maximum {MAX_ROOM_PHOTOS} photos are allowed. This room category already has {existing} photo(s).")
+
+
+def _validate_image(file: UploadFile) -> tuple[str, bytes]:
+    extension = Path(file.filename or "").suffix.lower()
+    if extension not in IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Only JPG, JPEG, PNG, WEBP and GIF images are allowed.")
+    return extension, None
 
 
 @router.post("/hotel/{hotel_id}", response_model=RoomTypeResponse, status_code=status.HTTP_201_CREATED)
@@ -52,6 +70,9 @@ def get_room_type(room_type_id: int, db: Session = Depends(get_db), current_user
 @router.put("/{room_type_id}", response_model=RoomTypeResponse)
 def update(room_type_id: int, room_type: RoomTypeUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     db_room_type = _owner_room_type(db, room_type_id, current_user)
+    photo_count = db.query(RoomTypePhoto).filter(RoomTypePhoto.room_type_id == db_room_type.id).count()
+    if photo_count < MIN_ROOM_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"At least {MIN_ROOM_PHOTOS} room photos are required before saving this room category.")
     return update_room_type(db=db, db_room_type=db_room_type, room_type=room_type)
 
 
@@ -72,10 +93,7 @@ def list_photos(room_type_id: int, db: Session = Depends(get_db), current_user: 
 async def upload_photos(room_type_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     room_type = _owner_room_type(db, room_type_id, current_user)
     existing = db.query(RoomTypePhoto).filter(RoomTypePhoto.room_type_id == room_type.id).count()
-    if len(files) < 3:
-        raise HTTPException(status_code=400, detail="Minimum 3 room photos are required.")
-    if existing + len(files) > 4:
-        raise HTTPException(status_code=400, detail=f"Maximum 4 photos are allowed. This room category already has {existing} photo(s).")
+    _validate_upload_count(existing, len(files))
 
     UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
     created = []
@@ -97,6 +115,36 @@ async def upload_photos(room_type_id: int, files: list[UploadFile] = File(...), 
     return created
 
 
+@router.put("/{room_type_id}/photos/{photo_id}")
+async def replace_photo(room_type_id: int, photo_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    room_type = _owner_room_type(db, room_type_id, current_user)
+    photo = db.query(RoomTypePhoto).filter(RoomTypePhoto.id == photo_id, RoomTypePhoto.room_type_id == room_type.id).first()
+    if photo is None:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    extension = Path(file.filename or "").suffix.lower()
+    if extension not in IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Only JPG, JPEG, PNG, WEBP and GIF images are allowed.")
+    content = await file.read(MAX_FILE_SIZE + 1)
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="Each room photo must be 10 MB or smaller.")
+    filename = f"{uuid4().hex}{extension}"
+    new_path = UPLOAD_ROOT / filename
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    new_path.write_bytes(content)
+    old_path = Path(str(photo.photo_url or "").split("/static/", 1)[-1]) if "/static/" in str(photo.photo_url) else None
+    photo.photo_url = f"/static/uploads/room-types/{filename}"
+    photo.caption = file.filename
+    db.commit()
+    db.refresh(photo)
+    if old_path:
+        old_file = UPLOAD_ROOT.parent.parent / old_path if not old_path.is_absolute() else old_path
+        try:
+            old_file.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return photo
+
+
 @router.delete("/{room_type_id}/photos/{photo_id}")
 def delete_photo(room_type_id: int, photo_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     room_type = _owner_room_type(db, room_type_id, current_user)
@@ -104,8 +152,8 @@ def delete_photo(room_type_id: int, photo_id: int, db: Session = Depends(get_db)
     if photo is None:
         raise HTTPException(status_code=404, detail="Photo not found")
     remaining = db.query(RoomTypePhoto).filter(RoomTypePhoto.room_type_id == room_type.id).count()
-    if remaining <= 3:
-        raise HTTPException(status_code=400, detail="A minimum of 3 room photos must be kept.")
+    if remaining <= MIN_ROOM_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"A minimum of {MIN_ROOM_PHOTOS} room photos must be kept.")
     db.delete(photo)
     db.commit()
     return {"message": "Photo deleted successfully"}
