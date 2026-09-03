@@ -11,7 +11,7 @@ from app.models.guest import Guest
 from app.models.hotel import Hotel, HotelStatus
 from app.models.notification import Notification
 from app.models.reservation import Reservation, ReservationStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.guest_review import GuestReview
 
 router = APIRouter(tags=["Reviews"])
@@ -69,7 +69,7 @@ def create_review(reservation_id: int, payload: ReviewPayload, db: Session = Dep
     message = f"Reservation #{reservation.confirmation_no} • {guest_name} • {review.overall_score:.1f}/10 • {reservation.hotel.name if reservation.hotel else 'Property'}"
     if owner_id:
         db.add(Notification(user_id=owner_id, hotel_id=reservation.hotel_id, title="New guest review", message=message, type="guest_review"))
-    admins = db.query(User).filter(User.role == "ADMIN").all()
+    admins = db.query(User).filter(User.role == UserRole.ADMIN).all()
     for admin in admins:
         db.add(Notification(user_id=admin.id, hotel_id=reservation.hotel_id, title="New guest review", message=message, type="guest_review"))
     db.commit(); db.refresh(review)
