@@ -62,9 +62,10 @@ def get_room_type(room_type_id: int, db: Session = Depends(get_db), current_user
 @router.put("/{room_type_id}", response_model=RoomTypeResponse)
 def update(room_type_id: int, room_type: RoomTypeUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     db_room_type = _owner_room_type(db, room_type_id, current_user)
-    photo_count = db.query(RoomTypePhoto).filter(RoomTypePhoto.room_type_id == db_room_type.id).count()
-    if photo_count < MIN_ROOM_PHOTOS:
-        raise HTTPException(status_code=400, detail=f"At least {MIN_ROOM_PHOTOS} room photos are required before saving this room category.")
+    if room_type.number_of_rooms is not None:
+        photo_count = db.query(RoomTypePhoto).filter(RoomTypePhoto.room_type_id == db_room_type.id).count()
+        if photo_count < MIN_ROOM_PHOTOS:
+            raise HTTPException(status_code=400, detail=f"At least {MIN_ROOM_PHOTOS} room photos are required before saving this room category.")
     return update_room_type(db=db, db_room_type=db_room_type, room_type=room_type)
 
 
