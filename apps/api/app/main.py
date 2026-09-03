@@ -37,7 +37,7 @@ def customer_login(): return HTMLResponse((STATIC_DIR/"customer-login.html").rea
 @app.get("/my-reservations",include_in_schema=False)
 def my_reservations():
     html=(STATIC_DIR/"my-reservations.html").read_text(encoding="utf-8")
-    html=html.replace("</body>",'<script src="/static/customer-reviews-ui.js?v=1"></script></body>')
+    html=html.replace("</body>",'<script src="/static/customer-reviews-ui.js?v=2"></script></body>')
     return HTMLResponse(html,headers={"Cache-Control":"no-store, no-cache, must-revalidate"})
 @app.get("/reservation-messages",include_in_schema=False)
 def reservation_messages(): return HTMLResponse((STATIC_DIR/"reservation-messages.html").read_text(encoding="utf-8"),headers={"Cache-Control":"no-store, no-cache, must-revalidate"})
