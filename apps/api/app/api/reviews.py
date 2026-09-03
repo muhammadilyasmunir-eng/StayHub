@@ -63,9 +63,16 @@ def customer_review(reservation_id: int, db: Session = Depends(get_db), current_
 def create_review(reservation_id: int, payload: ReviewPayload, db: Session = Depends(get_db), current_user: User = Depends(require_customer)):
     reservation = _customer_reservation(db, reservation_id, current_user); _ensure_after_checkout(reservation)
     if db.query(GuestReview).filter(GuestReview.reservation_id == reservation.id).first(): raise HTTPException(409, "A review has already been submitted for this reservation and cannot be submitted again.")
-    review = GuestReview(reservation_id=reservation.id, hotel_id=reservation.hotel_id, guest_id=reservation.guest_id, customer_user_id=current_user.id, **payload.model_dump()); db.add(review); db.commit(); db.refresh(review)
+    review = GuestReview(reservation_id=reservation.id, hotel_id=reservation.hotel_id, guest_id=reservation.guest_id, customer_user_id=current_user.id, **payload.model_dump()); db.add(review); db.flush()
     owner_id = reservation.hotel.owner_id if reservation.hotel else None
-    if owner_id: db.add(Notification(user_id=owner_id, hotel_id=reservation.hotel_id, title="New guest review", message=f"Guest submitted a {review.overall_score:.1f}/10 review for reservation #{reservation.confirmation_no}.", type="guest_review")); db.commit()
+    guest_name = f"{reservation.guest.first_name} {reservation.guest.last_name}".strip() if reservation.guest else "Guest"
+    message = f"Reservation #{reservation.confirmation_no} • {guest_name} • {review.overall_score:.1f}/10 • {reservation.hotel.name if reservation.hotel else 'Property'}"
+    if owner_id:
+        db.add(Notification(user_id=owner_id, hotel_id=reservation.hotel_id, title="New guest review", message=message, type="guest_review"))
+    admins = db.query(User).filter(User.role == "ADMIN").all()
+    for admin in admins:
+        db.add(Notification(user_id=admin.id, hotel_id=reservation.hotel_id, title="New guest review", message=message, type="guest_review"))
+    db.commit(); db.refresh(review)
     return _payload(review)
 
 @router.put("/customer/reservations/{reservation_id}/review")
