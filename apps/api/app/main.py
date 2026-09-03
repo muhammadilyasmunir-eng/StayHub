@@ -29,7 +29,7 @@ OWNER_RESERVATION_ENCODING_FIX_SCRIPT='<script src="/static/owner-reservation-en
 OWNER_NO_SHOW_DETAIL_UI_SCRIPT='<script src="/static/owner-no-show-detail-ui.js?v=4"></script>'
 @app.get("/",include_in_schema=False)
 def public_website():
-    html=(STATIC_DIR/"index.html").read_text(encoding="utf-8");html=html.replace('href="/static/public/login.html"','href="/customer-login");
+    html=(STATIC_DIR/"index.html").read_text(encoding="utf-8");html=html.replace('href="/static/public/login.html"','href="/customer-login"');
     if "date-defaults.js" not in html: html=html.replace("</body>",DATE_DEFAULT_SCRIPT+"</body>")
     return HTMLResponse(html,headers={"Cache-Control":"no-store, no-cache, must-revalidate"})
 @app.get("/customer-login",include_in_schema=False)
