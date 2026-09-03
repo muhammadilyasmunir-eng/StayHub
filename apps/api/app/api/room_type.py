@@ -12,7 +12,7 @@ from app.services.room_type_service import create_room_type, get_room_types, get
 
 router = APIRouter(prefix="/room-types", tags=["Room Types"])
 
-UPLOAD_ROOT = Path("app/static/uploads/room-types")
+UPLOAD_ROOT = Path(__file__).resolve().parent.parent / "static" / "uploads" / "room-types"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
 MIN_ROOM_PHOTOS = 3
@@ -130,7 +130,7 @@ async def replace_photo(room_type_id: int, photo_id: int, file: UploadFile = Fil
     db.refresh(photo)
     if "/static/" in old_url:
         old_relative = old_url.split("/static/", 1)[1]
-        old_file = Path("app/static") / old_relative
+        old_file = Path(__file__).resolve().parent.parent / "static" / old_relative
         try:
             old_file.unlink(missing_ok=True)
         except OSError:
