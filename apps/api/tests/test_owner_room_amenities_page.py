@@ -24,6 +24,13 @@ def test_room_amenities_page_contract_is_wired_to_room_types_and_facilities():
     assert "room_size: str | None" in schema
 
 
+def test_chargeable_amenities_are_not_saved_as_free_room_facilities():
+    root = Path(__file__).resolve().parents[1]
+    api = (root / "app" / "api" / "room_amenities.py").read_text(encoding="utf-8")
+    assert "CHARGEABLE_AMENITIES" in api
+    assert "name.strip() in CHARGEABLE_AMENITIES" in api
+
+
 def test_public_room_serializer_exposes_saved_room_amenities():
     root = Path(__file__).resolve().parents[1]
     public_hotels = (root / "app" / "api" / "public_hotels.py").read_text(encoding="utf-8")
