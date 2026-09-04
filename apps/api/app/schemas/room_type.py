@@ -12,6 +12,7 @@ class RoomTypeBase(BaseModel):
     base_price: Decimal = Decimal("0.00")
     discount_percent: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
     status: bool = True
+    room_size: str | None = None
 
 
 class RoomTypeCreate(RoomTypeBase):
@@ -27,6 +28,7 @@ class RoomTypeUpdate(BaseModel):
     base_price: Decimal | None = None
     discount_percent: Decimal | None = Field(default=None, ge=0, le=100)
     status: bool | None = None
+    room_size: str | None = None
 
 
 class RoomTypeResponse(RoomTypeBase):
