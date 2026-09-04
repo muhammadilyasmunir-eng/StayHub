@@ -8,6 +8,7 @@ from app.models.room_type_facility import RoomTypeFacility
 from app.models.user import User
 
 router = APIRouter(prefix="/room-amenities", tags=["Room Amenities"])
+CHARGEABLE_AMENITIES = {"Minibar", "Microwave", "Coffee machine", "Paid coffee", "Spa"}
 
 
 @router.get("/hotel/{hotel_id}")
@@ -30,7 +31,7 @@ def get_room_amenities(
 
     by_name: dict[str, set[int]] = {}
     for facility in facilities:
-        if facility.available:
+        if facility.available and facility.name not in CHARGEABLE_AMENITIES:
             by_name.setdefault(facility.name, set()).add(facility.room_type_id)
 
     return {
@@ -77,7 +78,7 @@ def save_room_amenities(
                 room.room_size = str(value).strip()[:100]
 
     for name, config in amenities.items():
-        if not isinstance(name, str) or not name.strip():
+        if not isinstance(name, str) or not name.strip() or name.strip() in CHARGEABLE_AMENITIES:
             continue
         config = config if isinstance(config, dict) else {}
         state = config.get("state", "none")
