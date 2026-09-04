@@ -3,7 +3,7 @@
   const pad=n=>String(n).padStart(2,'0');
   const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
   const dateOnly=v=>String(v||'').slice(0,10);
-  const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const esc=v=>String(v??'').replace(/[&<>\"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[m]));
   const money=v=>`PKR ${Number(v||0).toLocaleString('en-PK',{minimumFractionDigits:0,maximumFractionDigits:2})}`;
   const normalize=s=>String(s||'').toLowerCase().replace(/[_-]/g,'');
   const isCancel=r=>normalize(r.status).includes('cancel');
@@ -17,9 +17,28 @@
   function dateIn(r){return dateOnly(r.check_in)}
   function dateOut(r){return dateOnly(r.check_out)}
   function created(r){return dateOnly(r.created_at||r.booked_at||r.booking_date)}
+  function statusEventDate(r,type){
+    if(type==='canceled') return dateOnly(r.canceled_at||r.cancelled_at||r.cancellation_date||r.cancelled_date||r.status_changed_at||r.updated_at||r.check_in);
+    if(type==='no-show') return dateOnly(r.no_show_at||r.noshow_at||r.no_show_date||r.status_changed_at||r.updated_at||r.check_in);
+    return '';
+  }
   function overlaps(r,from,until){return dateIn(r)<=until&&dateOut(r)>=from}
   function valueText(r){return JSON.stringify(r).toLowerCase()}
-  function dateMatch(r){const f=state.from,u=state.until;if(state.dateOf==='canceled')return isCancel(r);if(state.dateOf==='no-show')return isNoShow(r);if(!f&&!u)return true;const from=f||u,until=u||f;switch(state.dateOf){case'reservation':return created(r)>=from&&created(r)<=until;case'checkout':return dateOut(r)>=from&&dateOut(r)<=until;case'stay':return overlaps(r,from,until);default:return dateIn(r)>=from&&dateIn(r)<=until}}
+  function dateMatch(r){
+    const f=state.from,u=state.until;
+    if(!f&&!u)return true;
+    const from=f||u,until=u||f;
+    if(state.dateOf==='canceled'||state.dateOf==='no-show'){
+      const eventDate=statusEventDate(r,state.dateOf);
+      return !!eventDate&&eventDate>=from&&eventDate<=until;
+    }
+    switch(state.dateOf){
+      case'reservation':return created(r)>=from&&created(r)<=until;
+      case'checkout':return dateOut(r)>=from&&dateOut(r)<=until;
+      case'stay':return overlaps(r,from,until);
+      default:return dateIn(r)>=from&&dateIn(r)<=until;
+    }
+  }
   function filterRows(rows){const q=state.guestOrBooking.trim().toLowerCase();return (rows||[]).filter(r=>{if(!dateMatch(r))return false;if(state.statuses.length){const s=normalize(r.status);const ok=state.statuses.some(x=>x==='ok'?isConfirmed(r):x==='canceled'?isCancel(r):x==='no-show'?isNoShow(r):s===normalize(x));if(!ok)return false}const text=valueText(r);if(state.corporateCard&&!((r.corporate_card===true)||text.includes('corporate card')||text.includes('corporate_card')))return false;if(state.guestCommunication&&!((r.guest_communication===true)||text.includes('guest communication')||text.includes('guest_communication')||text.includes('message')))return false;if(state.pendingGuestRequest&&!text.includes('pending guest request')&&!text.includes('pending_guest_request'))return false;if(state.invoiceRequired&&!text.includes('invoice required')&&!text.includes('invoice_required'))return false;if(state.invalidCard&&!text.includes('invalid credit card')&&!text.includes('invalid_credit_card'))return false;if(state.updated&&!text.includes('updated'))return false;if(state.pending&&!normalize(r.status).includes('pending'))return false;if(q&&!`${r.guest_name||''} ${r.confirmation_no||''} ${r.booking_number||''} ${r.id||''}`.toLowerCase().includes(q))return false;return true})}
   function style(){if(document.getElementById('shReservationSearchV2'))return;const s=document.createElement('style');s.id='shReservationSearchV2';s.textContent=`.sh-v2-search{border:1px solid #e1e6ee;border-radius:12px;background:#fff;padding:16px;margin-bottom:14px}.sh-v2-row{display:grid;grid-template-columns:180px 1fr 1fr auto;gap:12px;align-items:end}.sh-v2-field{display:flex;flex-direction:column;gap:6px}.sh-v2-field>label{font-size:11px;font-weight:800;color:#667085}.sh-v2-field input,.sh-v2-field select{height:40px;border:1px solid #d7dce5;border-radius:8px;padding:7px 10px;background:#fff}.sh-v2-more{margin-top:12px}.sh-v2-more summary{cursor:pointer;font-weight:800;color:#2563eb;user-select:none}.sh-v2-checks{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}.sh-v2-check{display:inline-flex;align-items:center;gap:6px;border:1px solid #e1e6ee;border-radius:8px;padding:7px 9px;font-size:12px;background:#fff}.sh-v2-actions{display:flex;gap:8px}.sh-v2-btn{height:40px;border:1px solid #d7dce5;border-radius:8px;padding:0 14px;background:#fff;font-weight:800;cursor:pointer}.sh-v2-btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}.sh-v2-summary{display:flex;justify-content:space-between;align-items:center;padding:10px 2px;font-size:13px}.sh-v2-table{min-width:1120px}.sh-v2-table tbody tr{cursor:pointer}.sh-v2-table tbody tr:hover{background:#f8fbff}.sh-v2-status{display:inline-flex;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:850}.sh-v2-ok{background:#eaf8ef;color:#15803d}.sh-v2-cancel{background:#fff0f1;color:#b91c1c}.sh-v2-noshow{background:#fff7df;color:#b45309}.sh-v2-pending{background:#eef2ff;color:#4338ca}.sh-v2-empty{padding:45px;text-align:center;color:#667085}.sh-v2-empty b{display:block;color:#172033;margin-bottom:5px}@media(max-width:800px){.sh-v2-row{grid-template-columns:1fr 1fr}.sh-v2-actions{grid-column:1/-1}.sh-v2-btn{flex:1}}@media(max-width:520px){.sh-v2-row{grid-template-columns:1fr}}`;document.head.appendChild(s)}
   function statusHtml(s){const n=normalize(s),c=n.includes('cancel')?'sh-v2-cancel':n.includes('noshow')?'sh-v2-noshow':n.includes('pending')?'sh-v2-pending':'sh-v2-ok';return `<span class="sh-v2-status ${c}">${esc(s||'Pending')}</span>`}
