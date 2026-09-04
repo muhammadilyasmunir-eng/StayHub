@@ -7,6 +7,7 @@ def test_room_amenities_page_contract_is_wired_to_room_types_and_facilities():
     api = (root / "app" / "api" / "room_amenities.py").read_text(encoding="utf-8")
     routes = (root / "app" / "api" / "routes.py").read_text(encoding="utf-8")
     main = (root / "app" / "main.py").read_text(encoding="utf-8")
+    schema = (root / "app" / "schemas" / "room_type.py").read_text(encoding="utf-8")
 
     assert "Room Amenities" in page
     assert "All rooms" in page
@@ -20,6 +21,7 @@ def test_room_amenities_page_contract_is_wired_to_room_types_and_facilities():
     assert "room_type_ids" in api
     assert "room_amenities_router" in routes
     assert "owner-room-amenities.js?v=1" in main
+    assert "room_size: str | None" in schema
 
 
 def test_public_room_serializer_exposes_saved_room_amenities():
