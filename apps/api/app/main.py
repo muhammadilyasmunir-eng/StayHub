@@ -18,6 +18,7 @@ def ensure_schema():
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE terms_documents ADD COLUMN IF NOT EXISTS document_type VARCHAR(40) DEFAULT 'terms'"));conn.execute(text("UPDATE terms_documents SET document_type='terms' WHERE document_type IS NULL"));conn.execute(text("ALTER TABLE hotels ADD COLUMN IF NOT EXISTS commission_percent NUMERIC(5,2)"));conn.execute(text("ALTER TABLE hotels ALTER COLUMN tax_percent DROP NOT NULL"));conn.execute(text("ALTER TABLE hotels ALTER COLUMN tax_percent DROP DEFAULT"));conn.execute(text("UPDATE hotels SET tax_percent=NULL WHERE tax_percent=0"));conn.execute(text("DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_type WHERE typname='reservationdisputestatus') THEN ALTER TYPE reservationdisputestatus ADD VALUE IF NOT EXISTS 'OWNER_VERIFIED'; END IF; END $$"))
 DATE_DEFAULT_SCRIPT='<script src="/static/date-defaults.js?v=3"></script>'
+NOTIFICATION_BELL_SCRIPT='<script src="/static/notification-bell.js?v=1"></script>'
 RESERVATION_MANAGEMENT_SCRIPT='<script src="/static/reservation-management-ui.js?v=2"></script>'
 RESERVATION_DETAIL_ACTIONS_FIX_SCRIPT='<script src="/static/reservation-details-actions-fix.js?v=1"></script>'
 OWNER_ROOM_INVENTORY_PHOTOS_SCRIPT='<script src="/static/owner-room-inventory-photos.js?v=15"></script>'
@@ -37,10 +38,13 @@ def customer_login(): return HTMLResponse((STATIC_DIR/"customer-login.html").rea
 @app.get("/my-reservations",include_in_schema=False)
 def my_reservations():
     html=(STATIC_DIR/"my-reservations.html").read_text(encoding="utf-8")
-    html=html.replace("</body",'<script src="/static/customer-reviews-ui.js?v=2"></script></body>')
+    html=html.replace("</body",'<script src="/static/customer-reviews-ui.js?v=2"></script>'+NOTIFICATION_BELL_SCRIPT+'</body>')
     return HTMLResponse(html,headers={"Cache-Control":"no-store, no-cache, must-revalidate"})
 @app.get("/reservation-messages",include_in_schema=False)
-def reservation_messages(): return HTMLResponse((STATIC_DIR/"reservation-messages.html").read_text(encoding="utf-8"),headers={"Cache-Control":"no-store, no-cache, must-revalidate"})
+def reservation_messages():
+    html=(STATIC_DIR/"reservation-messages.html").read_text(encoding="utf-8")
+    if "notification-bell.js" not in html: html=html.replace("</body",NOTIFICATION_BELL_SCRIPT+"</body>")
+    return HTMLResponse(html,headers={"Cache-Control":"no-store, no-cache, must-revalidate"})
 @app.get("/hotel/{slug}",include_in_schema=False)
 def public_hotel_detail(slug:str):
     html=(STATIC_DIR/"public"/"hotel.html").read_text(encoding="utf-8");html=html.replace("</body",'<script src="/static/public/public-reviews-ui.js?v=1"></script></body>')
@@ -64,7 +68,7 @@ def owner_registration():
 def list_your_property(): return owner_registration()
 @app.get("/admin",include_in_schema=False)
 def admin_panel():
-    path=STATIC_DIR/"admin-panel.html";html=path.read_text(encoding="utf-8");scripts='<script src="/static/admin-finance.js?v=1"></script><script src="/static/admin-property-media.js?v=1"></script><script src="/static/admin-property-operations.js?v=1"></script><script src="/static/admin-property-editor.js?v=1"></script><script src="/static/admin-auth-guard.js?v=3"></script><script src="/static/admin-approval-workflow-v2.js?v=3"></script><script src="/static/admin-final-property-review.js?v=1"></script><script src="/static/admin-final-review-ui-fix.js?v=1"></script><script src="/static/admin-property-media-manager.js?v=1"></script><script src="/static/admin-media-view-modal.js?v=1"></script><script src="/static/admin-live-properties-ui.js?v=1"></script><script src="/static/date-defaults.js?v=3"></script><script src="/static/reservation-management-ui.js?v=2"></script><script src="/static/reservation-details-actions-fix.js?v=1"></script><script src="/static/admin-reservation-disputes.js?v=2"></script><script src="/static/admin-reviews-ui.js?v=1"></script>'
+    path=STATIC_DIR/"admin-panel.html";html=path.read_text(encoding="utf-8");scripts='<script src="/static/admin-finance.js?v=1"></script><script src="/static/admin-property-media.js?v=1"></script><script src="/static/admin-property-operations.js?v=1"></script><script src="/static/admin-property-editor.js?v=1"></script><script src="/static/admin-auth-guard.js?v=3"></script><script src="/static/admin-approval-workflow-v2.js?v=3"></script><script src="/static/admin-final-property-review.js?v=1"></script><script src="/static/admin-final-review-ui-fix.js?v=1"></script><script src="/static/admin-property-media-manager.js?v=1"></script><script src="/static/admin-media-view-modal.js?v=1"></script><script src="/static/admin-live-properties-ui.js?v=1"></script><script src="/static/date-defaults.js?v=3"></script><script src="/static/reservation-management-ui.js?v=2"></script><script src="/static/reservation-details-actions-fix.js?v=1"></script><script src="/static/admin-reservation-disputes.js?v=2"></script><script src="/static/admin-reviews-ui.js?v=1"></script><script src="/static/notification-bell.js?v=1"></script>'
     for marker in ("admin-approval-workflow-v2.js","admin-terms-workflow.js"): html=html.replace(f'<script src="/static/{marker}?v=2"></script>','');html=html.replace(f'<script src="/static/{marker}?v=1"></script>','')
     if "admin-final-review-ui-fix.js?v=1" not in html: html=html.replace("</body>",scripts+"</body>")
     else:
@@ -76,6 +80,7 @@ def admin_panel():
         if "reservation-details-actions-fix.js?v=1" not in html: html=html.replace("</body",RESERVATION_DETAIL_ACTIONS_FIX_SCRIPT+"</body>")
         if "admin-reservation-disputes.js?v=2" not in html: html=html.replace("</body",'<script src="/static/admin-reservation-disputes.js?v=2"></script></body>')
         if "admin-reviews-ui.js?v=1" not in html: html=html.replace("</body",'<script src="/static/admin-reviews-ui.js?v=1"></script></body>')
+        if "notification-bell.js?v=1" not in html: html=html.replace("</body",NOTIFICATION_BELL_SCRIPT+"</body>")
     return HTMLResponse(html,headers={"Cache-Control":"no-store, no-cache, must-revalidate"})
 @app.get("/owner",include_in_schema=False)
 def owner_portal():
