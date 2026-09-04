@@ -1,65 +1,55 @@
 (() => {
   'use strict';
-  const pad = n => String(n).padStart(2, '0');
-  const localToday = () => { const d = new Date(); d.setHours(12,0,0,0); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
-  const normalize = value => String(value || '').slice(0, 10);
-  const getSelected = () => window.reservationSelectedDate || localToday();
-
-  function removeClearButton() {
-    const section = document.getElementById('reservations');
-    if (!section) return;
-    const clear = [...section.querySelectorAll('button')].find(b => b.id === 'shClear' || b.textContent.trim() === 'Clear');
-    if (clear) clear.remove();
-  }
-
-  function renderForDate(value) {
-    const selected = normalize(value) || localToday();
-    window.reservationSelectedDate = selected;
-    const ci = document.getElementById('shCi');
-    const co = document.getElementById('shCo');
-    const status = document.getElementById('shStatus');
-    const q = document.getElementById('shQ');
-    const apply = document.getElementById('shApply');
-    if (ci && apply) {
-      ci.value = selected;
-      if (co) co.value = '';
-      if (status) status.value = '';
-      if (q) q.value = '';
-      apply.click();
-      return;
-    }
-    const input = document.getElementById('reservationDate');
-    if (input) input.value = selected;
-    if (typeof window.loadData === 'function') window.loadData();
-  }
-
-  window.getReservationDate = getSelected;
-  window.renderReservationDate = () => {
-    const input = document.getElementById('reservationDate');
-    if (input) input.value = getSelected();
+  const pad=n=>String(n).padStart(2,'0');
+  const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+  const dateOnly=v=>String(v||'').slice(0,10);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const money=v=>`PKR ${Number(v||0).toLocaleString('en-PK',{minimumFractionDigits:0,maximumFractionDigits:2})}`;
+  const normalize=s=>String(s||'').toLowerCase().replace(/[_-]/g,'');
+  const isCancel=r=>normalize(r.status).includes('cancel');
+  const isNoShow=r=>normalize(r.status).includes('noshow');
+  const isConfirmed=r=>normalize(r.status)==='confirmed'||normalize(r.status)==='ok';
+  const state=window.__stayhubReservationSearch||{
+    dateOf:'checkin',from:today(),until:dateAdd(today(),1),statuses:[],corporateCard:false,guestCommunication:false,pendingGuestRequest:false,invoiceRequired:false,invalidCard:false,updated:false,pending:false,guestOrBooking:'',activeDashboard:''
   };
-  window.setReservationDate = value => renderForDate(value);
-  window.changeReservationDate = offset => {
-    const d = new Date(`${getSelected()}T12:00:00`);
-    if (Number.isNaN(d.getTime())) return renderForDate(localToday());
-    d.setDate(d.getDate() + Number(offset || 0));
-    renderForDate(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`);
-  };
-
-  function bind() {
-    const section = document.getElementById('reservations');
-    if (!section) return;
-    removeClearButton();
-    const buttons = [...section.querySelectorAll('button')];
-    const previous = buttons.find(b => b.textContent.trim() === '‹ Previous');
-    const next = buttons.find(b => b.textContent.trim() === 'Next ›');
-    const today = buttons.find(b => b.textContent.trim() === 'Today');
-    if (previous) previous.onclick = e => { e.preventDefault(); window.changeReservationDate(-1); };
-    if (next) next.onclick = e => { e.preventDefault(); window.changeReservationDate(1); };
-    if (today) today.onclick = e => { e.preventDefault(); window.setReservationDate(localToday()); };
+  window.__stayhubReservationSearch=state;
+  function dateAdd(v,n){const d=new Date(`${v}T12:00:00`);d.setDate(d.getDate()+Number(n||0));return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+  function dateIn(r){return dateOnly(r.check_in)}
+  function dateOut(r){return dateOnly(r.check_out)}
+  function created(r){return dateOnly(r.created_at||r.booked_at||r.booking_date)}
+  function overlaps(r,from,until){return dateIn(r)<=until&&dateOut(r)>=from}
+  function valueText(r){return JSON.stringify(r).toLowerCase()}
+  function dateMatch(r){const f=state.from,u=state.until;if(!f&&!u)return true;const from=f||u,until=u||f;switch(state.dateOf){case'reservation':return created(r)>=from&&created(r)<=until;case'checkout':return dateOut(r)>=from&&dateOut(r)<=until;case'stay':return overlaps(r,from,until);default:return dateIn(r)>=from&&dateIn(r)<=until}}
+  function filterRows(rows){const q=state.guestOrBooking.trim().toLowerCase();return (rows||[]).filter(r=>{
+    if(!dateMatch(r))return false;
+    if(state.statuses.length){const s=normalize(r.status);const ok=state.statuses.some(x=>x==='ok'?isConfirmed(r):x==='canceled'?isCancel(r):x==='no-show'?isNoShow(r):s===normalize(x));if(!ok)return false}
+    const text=valueText(r);
+    if(state.corporateCard&&!((r.corporate_card===true)||text.includes('corporate card')||text.includes('corporate_card')))return false;
+    if(state.guestCommunication&&!((r.guest_communication===true)||text.includes('guest communication')||text.includes('guest_communication')||text.includes('message')))return false;
+    if(state.pendingGuestRequest&&!text.includes('pending guest request')&&!text.includes('pending_guest_request'))return false;
+    if(state.invoiceRequired&&!text.includes('invoice required')&&!text.includes('invoice_required'))return false;
+    if(state.invalidCard&&!text.includes('invalid credit card')&&!text.includes('invalid_credit_card'))return false;
+    if(state.updated&&!text.includes('updated'))return false;
+    if(state.pending&&!normalize(r.status).includes('pending'))return false;
+    if(q&&!`${r.guest_name||''} ${r.confirmation_no||''} ${r.booking_number||''} ${r.id||''}`.toLowerCase().includes(q))return false;
+    return true;
+  })}
+  function style(){if(document.getElementById('shReservationSearchV2'))return;const s=document.createElement('style');s.id='shReservationSearchV2';s.textContent=`.sh-v2-search{border:1px solid #e1e6ee;border-radius:12px;background:#fff;padding:16px;margin-bottom:14px}.sh-v2-row{display:grid;grid-template-columns:180px 1fr 1fr auto;gap:12px;align-items:end}.sh-v2-field{display:flex;flex-direction:column;gap:6px}.sh-v2-field>label{font-size:11px;font-weight:800;color:#667085}.sh-v2-field input,.sh-v2-field select{height:40px;border:1px solid #d7dce5;border-radius:8px;padding:7px 10px;background:#fff}.sh-v2-more{margin-top:12px}.sh-v2-more summary{cursor:pointer;font-weight:800;color:#2563eb;user-select:none}.sh-v2-checks{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}.sh-v2-check{display:inline-flex;align-items:center;gap:6px;border:1px solid #e1e6ee;border-radius:8px;padding:7px 9px;font-size:12px;background:#fff}.sh-v2-actions{display:flex;gap:8px}.sh-v2-btn{height:40px;border:1px solid #d7dce5;border-radius:8px;padding:0 14px;background:#fff;font-weight:800;cursor:pointer}.sh-v2-btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}.sh-v2-summary{display:flex;justify-content:space-between;align-items:center;padding:10px 2px;font-size:13px}.sh-v2-table{min-width:1120px}.sh-v2-table tbody tr{cursor:pointer}.sh-v2-table tbody tr:hover{background:#f8fbff}.sh-v2-status{display:inline-flex;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:850}.sh-v2-ok{background:#eaf8ef;color:#15803d}.sh-v2-cancel{background:#fff0f1;color:#b91c1c}.sh-v2-noshow{background:#fff7df;color:#b45309}.sh-v2-pending{background:#eef2ff;color:#4338ca}.sh-v2-empty{padding:45px;text-align:center;color:#667085}.sh-v2-empty b{display:block;color:#172033;margin-bottom:5px}@media(max-width:800px){.sh-v2-row{grid-template-columns:1fr 1fr}.sh-v2-actions{grid-column:1/-1}.sh-v2-btn{flex:1}}@media(max-width:520px){.sh-v2-row{grid-template-columns:1fr}}`;document.head.appendChild(s)}
+  function statusHtml(s){const n=normalize(s),c=n.includes('cancel')?'sh-v2-cancel':n.includes('noshow')?'sh-v2-noshow':n.includes('pending')?'sh-v2-pending':'sh-v2-ok';return `<span class="sh-v2-status ${c}">${esc(s||'Pending')}</span>`}
+  function ensureUI(){const sec=document.getElementById('reservations'),card=sec?.querySelector('.card');if(!sec||!card)return;style();let old=card.querySelector('.sh-res-toolbar');if(old)old.style.display='none';let root=document.getElementById('shReservationSearchV2Root');if(!root){root=document.createElement('div');root.id='shReservationSearchV2Root';root.className='sh-v2-search';root.innerHTML=`<div class="sh-v2-row"><div class="sh-v2-field"><label>Date of</label><select id="shV2DateOf"><option value="reservation">Reservation</option><option value="checkin">Check-in</option><option value="checkout">Check-out</option><option value="stay">Stay</option></select></div><div class="sh-v2-field"><label>From</label><input id="shV2From" type="date"></div><div class="sh-v2-field"><label>Until</label><input id="shV2Until" type="date"></div><div class="sh-v2-actions"><button class="sh-v2-btn primary" id="shV2Show">Show</button></div></div><details class="sh-v2-more"><summary>More filters</summary><div class="sh-v2-checks"><label class="sh-v2-check"><input type="checkbox" data-f="ok"> Ok</label><label class="sh-v2-check"><input type="checkbox" data-f="canceled"> Canceled</label><label class="sh-v2-check"><input type="checkbox" data-f="no-show"> No-show</label><label class="sh-v2-check"><input type="checkbox" id="shV2Corporate"> Corporate card</label><label class="sh-v2-check"><input type="checkbox" id="shV2Communication"> Guest Communication</label><label class="sh-v2-check"><input type="checkbox" id="shV2PendingRequest"> Pending guest request</label><label class="sh-v2-check"><input type="checkbox" id="shV2Invoice"> Invoice required</label><label class="sh-v2-check"><input type="checkbox" id="shV2InvalidCard"> Invalid credit card</label><label class="sh-v2-check"><input type="checkbox" id="shV2Updated"> Updated</label><label class="sh-v2-check"><input type="checkbox" id="shV2Pending"> Pending</label><label class="sh-v2-check" style="flex:1;min-width:230px"><input type="checkbox" id="shV2GuestBooking"> Guest name or booking number</label><input id="shV2Query" type="search" placeholder="Enter guest name or booking number" style="height:34px;border:1px solid #d7dce5;border-radius:7px;padding:5px 9px;min-width:230px"></div></details></div>`;card.insertBefore(root,card.firstChild);}
+    document.getElementById('shV2DateOf').value=state.dateOf;document.getElementById('shV2From').value=state.from;document.getElementById('shV2Until').value=state.until;document.getElementById('shV2Query').value=state.guestOrBooking;
+    ['corporate','communication','pendingRequest','invoice','invalidCard','updated','pending'].forEach(k=>{const id={corporate:'shV2Corporate',communication:'shV2Communication',pendingRequest:'shV2PendingRequest',invoice:'shV2Invoice',invalidCard:'shV2InvalidCard',updated:'shV2Updated',pending:'shV2Pending'}[k];document.getElementById(id).checked=!!state[k]});
+    document.querySelectorAll('#shReservationSearchV2Root input[data-f]').forEach(x=>x.checked=state.statuses.includes(x.dataset.f));
+    document.getElementById('shV2Show').onclick=()=>{state.dateOf=document.getElementById('shV2DateOf').value;state.from=document.getElementById('shV2From').value;state.until=document.getElementById('shV2Until').value;state.statuses=[...document.querySelectorAll('#shReservationSearchV2Root input[data-f]:checked')].map(x=>x.dataset.f);state.corporateCard=document.getElementById('shV2Corporate').checked;state.guestCommunication=document.getElementById('shV2Communication').checked;state.pendingGuestRequest=document.getElementById('shV2PendingRequest').checked;state.invoiceRequired=document.getElementById('shV2Invoice').checked;state.invalidCard=document.getElementById('shV2InvalidCard').checked;state.updated=document.getElementById('shV2Updated').checked;state.pending=document.getElementById('shV2Pending').checked;state.guestOrBooking=document.getElementById('shV2GuestBooking').checked?document.getElementById('shV2Query').value.trim():'';render();};
   }
-
-  const start = () => { bind(); setTimeout(bind,100); setTimeout(bind,500); setTimeout(bind,1000); };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once:true}); else start();
-  new MutationObserver(bind).observe(document.documentElement, {childList:true, subtree:true});
+  function render(){ensureUI();const host=document.getElementById('reservationTable');if(!host)return;const rows=filterRows(window.data?.res||[]);const summary=document.getElementById('shV2Summary')||document.createElement('div');summary.id='shV2Summary';summary.className='sh-v2-summary';summary.innerHTML=`<b>${rows.length} reservation${rows.length===1?'':'s'}</b><span>${state.from||'—'} → ${state.until||'—'}</span>`;if(!summary.parentNode)host.parentNode.insertBefore(summary,host);host.innerHTML=rows.length?`<div class="table-wrap"><table class="table sh-v2-table"><thead><tr><th>Guest Name</th><th>Check-in</th><th>Check-out</th><th>Rooms</th><th>Booked on</th><th>Status</th><th>Price</th><th>Commission</th><th>Booking number</th></tr></thead><tbody id="resBody">${rows.map(r=>`<tr data-res-id="${esc(r.id)}"><td><b>${esc(r.guest_name||'Guest')}</b><small style="display:block;color:#667085;margin-top:4px">${esc(`${r.adults||0} adults${r.children?`, ${r.children} children`:''}`)}</small></td><td>${esc(dateOnly(r.check_in)||'—')}</td><td>${esc(dateOnly(r.check_out)||'—')}</td><td>${esc(r.room_type_name||r.room_number||'—')}</td><td>${esc(created(r)||'—')}</td><td>${statusHtml(r.status)}</td><td><b>${money(r.total_amount)}</b></td><td>${money(isCancel(r)?0:r.commission_amount)}</td><td><b>${esc(r.confirmation_no||r.booking_number||r.id||'—')}</b></td></tr>`).join('')}</tbody></table></div>`:'<div class="sh-v2-empty"><b>No reservations found</b>Try changing the selected dates or filters.</div>';}
+  function dashboardRows(filter){const t=today(),rows=window.data?.res||[];if(filter==='today-checkout')return rows.filter(r=>dateOut(r)===t);if(filter==='today-checkin')return rows.filter(r=>dateIn(r)===t&&isConfirmed(r));if(filter==='new-bookings')return rows.filter(r=>created(r)===t);if(filter==='stay-over')return rows.filter(r=>!isCancel(r)&&dateIn(r)<=t&&dateOut(r)>t);if(filter==='cancel')return rows.filter(r=>isCancel(r)&&dateOnly(r.updated_at||r.cancelled_at||r.created_at)===t);return rows.filter(r=>dateIn(r)===t)}
+  function openDashboard(filter){state.activeDashboard=filter||'today';state.dateOf=filter==='today-checkout'?'checkout':filter==='stay-over'?'stay':'checkin';state.from=today();state.until=filter==='today-checkout'?today():filter==='stay-over'?today():filter==='today-checkin'?today():today();state.statuses=filter==='cancel'?['canceled']:[];state.corporateCard=false;state.guestCommunication=false;state.pendingGuestRequest=false;state.invoiceRequired=false;state.invalidCard=false;state.updated=false;state.pending=false;state.guestOrBooking='';showReservations();render();}
+  function showReservations(){const sec=document.getElementById('reservations');if(!sec)return;sec.classList.remove('hidden');document.querySelectorAll('main section').forEach(s=>{if(s!==sec)s.classList.add('hidden')});document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',/Reservations/i.test(b.textContent||'')));ensureUI()}
+  const originalNav=window.navTo;window.navTo=function(id,filter){if(id==='reservations'){openDashboard(filter||'today');return}return typeof originalNav==='function'?originalNav.apply(this,arguments):undefined};
+  const originalLoad=window.loadData;window.loadData=async function(){const result=await originalLoad?.apply(this,arguments);setTimeout(()=>{ensureUI();render()},0);return result};
+  const originalShow=window.show;window.show=function(id,btn){const result=originalShow?.apply(this,arguments);if(id==='reservations'){setTimeout(()=>{ensureUI();render()},80)}return result};
+  function bind(){style();ensureUI();if(!window.__stayhubReservationInitialised){window.__stayhubReservationInitialised=true;setTimeout(render,100)}}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
+  new MutationObserver(()=>{if(document.getElementById('reservations')&&!document.getElementById('shReservationSearchV2Root'))ensureUI()}).observe(document.documentElement,{childList:true,subtree:true});
 })();
