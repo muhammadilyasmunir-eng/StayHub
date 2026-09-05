@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="StayHub hotel search results">
+    <title>StayHub — Search results</title>
+    <link rel="stylesheet" href="/static/public/search-results.css?v=1">
+</head>
+<body>
+<header class="sr-header">
+    <div class="sr-shell sr-header-inner">
+        <a href="/" class="sr-brand" aria-label="StayHub home">
+            <span class="sr-brand-mark">S</span>
+            <span><strong>StayHub</strong><small>Hotels & Stays</small></span>
+        </a>
+        <nav class="sr-nav" aria-label="Main navigation">
+            <a href="/">Home</a>
+            <a href="/#destinations">Destinations</a>
+            <a href="/static/public/owner-register.html">List Your Property</a>
+            <a href="/customer-login">Login</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <section class="sr-search-strip">
+        <div class="sr-shell">
+            <form id="search-form" class="sr-search" autocomplete="off">
+                <label class="sr-search-field sr-destination">
+                    <span>Destination</span>
+                    <input id="destination" type="text" placeholder="City or property" aria-label="Destination">
+                </label>
+                <label class="sr-search-field">
+                    <span>Check-in</span>
+                    <input id="check-in" type="date" aria-label="Check-in">
+                </label>
+                <label class="sr-search-field">
+                    <span>Check-out</span>
+                    <input id="check-out" type="date" aria-label="Check-out">
+                </label>
+                <label class="sr-search-field sr-guests">
+                    <span>Guests</span>
+                    <select id="guests" aria-label="Guests">
+                        <option>1 Guest</option><option selected>2 Guests</option><option>3 Guests</option>
+                        <option>4 Guests</option><option>5 Guests</option><option>6 Guests</option>
+                    </select>
+                </label>
+                <button class="sr-search-button" type="submit">Search stays</button>
+            </form>
+        </div>
+    </section>
+
+    <section class="sr-main sr-shell">
+        <div class="sr-heading-row">
+            <div>
+                <div class="sr-kicker">STAYHUB DISCOVERY</div>
+                <h1 id="results-title">Places to stay</h1>
+                <p id="results-summary">Finding available properties for your dates…</p>
+            </div>
+            <div class="sr-sort-wrap">
+                <label for="sort">Sort</label>
+                <select id="sort">
+                    <option value="recommended">Recommended</option>
+                    <option value="price-low">Price: low to high</option>
+                    <option value="price-high">Price: high to low</option>
+                    <option value="rating">Guest rating / stars</option>
+                    <option value="name">Property name</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="sr-layout">
+            <aside class="sr-filters" aria-label="Search filters">
+                <div class="sr-filter-title">
+                    <div><span class="sr-kicker">REFINE</span><h2>Find your fit</h2></div>
+                    <button id="clear-filters" type="button">Clear</button>
+                </div>
+
+                <fieldset>
+                    <legend>Property type</legend>
+                    <label><input type="checkbox" name="property-type" value="Hotel"> Hotel</label>
+                    <label><input type="checkbox" name="property-type" value="Resort"> Resort</label>
+                    <label><input type="checkbox" name="property-type" value="Guest House"> Guest House</label>
+                    <label><input type="checkbox" name="property-type" value="Apartment"> Apartment</label>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Stay rating</legend>
+                    <label class="choice-row"><input type="checkbox" name="stars" value="5"><span>★★★★★</span><small>5 star</small></label>
+                    <label class="choice-row"><input type="checkbox" name="stars" value="4"><span>★★★★</span><small>4+ star</small></label>
+                    <label class="choice-row"><input type="checkbox" name="stars" value="3"><span>★★★</span><small>3+ star</small></label>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Popular facilities</legend>
+                    <label><input type="checkbox" name="facility" value="WiFi"> Wi-Fi</label>
+                    <label><input type="checkbox" name="facility" value="Parking"> Parking</label>
+                    <label><input type="checkbox" name="facility" value="Swimming Pool"> Swimming pool</label>
+                    <label><input type="checkbox" name="facility" value="Restaurant"> Restaurant</label>
+                    <label><input type="checkbox" name="facility" value="Air Conditioning"> Air conditioning</label>
+                </fieldset>
+            </aside>
+
+            <section class="sr-results" aria-live="polite">
+                <div id="loading" class="sr-state">
+                    <div class="sr-spinner"></div><strong>Finding available stays</strong><span>Checking rooms and dates…</span>
+                </div>
+                <div id="error" class="sr-state sr-state-error hidden">
+                    <div class="sr-state-icon">!</div><strong>We couldn't load the stays</strong><span>Please try the search again.</span><button id="retry" type="button">Try again</button>
+                </div>
+                <div id="empty" class="sr-state hidden">
+                    <div class="sr-state-icon">⌂</div><strong>No matching stays yet</strong><span>Try another destination, dates, or remove a filter.</span>
+                </div>
+                <div id="hotel-grid" class="sr-hotel-grid"></div>
+            </section>
+        </div>
+    </section>
+</main>
+
+<footer class="sr-footer">
+    <div class="sr-shell sr-footer-inner">
+        <strong>StayHub</strong>
+        <span>Discover. Compare. Stay.</span>
+        <span>© 2026 StayHub</span>
+    </div>
+</footer>
+
+<script src="/static/public/search-results.js?v=1"></script>
+</body>
+</html>
