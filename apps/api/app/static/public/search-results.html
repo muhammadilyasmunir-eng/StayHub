@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>StayHub — Search results</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ3Qf5g7xQ8fK8J8w8e5y7qQ1pQ8J4=" crossorigin="">
+<link rel="stylesheet" href="/static/public/search-results.css?v=1">
+</head>
+<body>
+<header class="site-header"><a class="brand" href="/">StayHub <span>Hotels & Stays</span></a><nav><a href="/">Home</a><a href="/customer-login">Login</a><a class="owner-link" href="/list-your-property">List Your Property</a></nav></header>
+<main>
+<section class="search-strip">
+  <div class="search-field destination"><label>Where are you going?</label><input id="destination" type="text" placeholder="City or hotel name"></div>
+  <div class="search-field"><label>Check-in date</label><input id="check-in" type="date"></div>
+  <div class="search-field"><label>Check-out date</label><input id="check-out" type="date"></div>
+  <div class="search-field occupancy"><label>Guests & rooms</label><select id="guests"><option value="1">1 adult · 1 room</option><option value="2" selected>2 adults · 1 room</option><option value="3">3 adults · 1 room</option><option value="4">4 adults · 1 room</option><option value="5">5 adults · 1 room</option><option value="6">6 adults · 1 room</option></select></div>
+  <button id="search-button" class="primary">Search</button>
+</section>
+<div class="breadcrumbs"><a href="/">Home</a><span>›</span><span>Search results</span></div>
+<section class="layout">
+<aside class="sidebar">
+  <div class="compare"><span>Compare properties</span><button id="compare-toggle" aria-label="Compare properties"><i></i></button></div>
+  <div class="filter-card">
+    <div class="filter-heading">Filter by:<button id="clear-filters" class="clear">Clear</button></div>
+    <div class="filter-section"><h3>Price per night</h3><div class="price-values"><span id="min-price-label">PKR 0</span><span id="max-price-label">PKR 0</span></div><input id="price-min" type="range" min="0" max="100000" value="0" step="500"><input id="price-max" type="range" min="0" max="100000" value="100000" step="500"></div>
+    <div class="filter-section"><h3>Review score</h3><label class="check"><input class="rating-filter" type="checkbox" value="9"><span>Wonderful: 9+</span><em id="count-9">0</em></label><label class="check"><input class="rating-filter" type="checkbox" value="8"><span>Very Good: 8+</span><em id="count-8">0</em></label><label class="check"><input class="rating-filter" type="checkbox" value="7"><span>Good: 7+</span><em id="count-7">0</em></label><label class="check"><input class="rating-filter" type="checkbox" value="6"><span>Pleasant: 6+</span><em id="count-6">0</em></label></div>
+    <div class="filter-section"><h3>Property type</h3><div id="property-types"></div></div>
+    <div class="filter-section"><h3>Facilities</h3><label class="check"><input class="facility-filter" type="checkbox" value="Free WiFi"><span>Free WiFi</span><em id="facility-free-wifi">0</em></label><label class="check"><input class="facility-filter" type="checkbox" value="Parking"><span>Parking</span><em id="facility-parking">0</em></label><label class="check"><input class="facility-filter" type="checkbox" value="Swimming pool"><span>Swimming pool</span><em id="facility-pool">0</em></label><label class="check"><input class="facility-filter" type="checkbox" value="Restaurant"><span>Restaurant</span><em id="facility-restaurant">0</em></label><label class="check"><input class="facility-filter" type="checkbox" value="Airport shuttle"><span>Airport shuttle</span><em id="facility-shuttle">0</em></label></div>
+    <div class="filter-section"><h3>Travel group</h3><label class="check"><input type="checkbox" id="family-filter"><span>Family friendly</span></label><label class="check"><input type="checkbox" id="adults-filter"><span>Adults only</span></label></div>
+    <div class="filter-section"><h3>Breakfast</h3><label class="check"><input type="checkbox" id="breakfast-filter"><span>Breakfast available</span></label></div>
+  </div>
+</aside>
+<section class="results-area">
+  <div class="results-toolbar"><div><h1 id="result-title">Properties found</h1><p id="result-subtitle">Loading available properties…</p></div><div class="toolbar-actions"><button id="map-button" class="view-button active">📍 Map</button><button id="list-button" class="view-button active">☷ List</button><button id="grid-button" class="view-button">▦ Grid</button><select id="sort"><option value="recommended">Our top picks</option><option value="price_low">Price (lowest first)</option><option value="price_high">Price (highest first)</option><option value="rating">Review score</option></select></div></div>
+  <div id="map-wrap" class="map-wrap"><div id="map"></div></div>
+  <div id="loading" class="loading">Loading properties…</div>
+  <div id="property-list" class="property-list"></div>
+  <div id="empty" class="empty hidden"><strong>No properties match your filters.</strong><span>Try clearing a filter or changing your dates.</span></div>
+</section>
+</section>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="/static/public/search-results.js?v=1"></script>
+</body>
+</html>

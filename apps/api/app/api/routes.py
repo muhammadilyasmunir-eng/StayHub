@@ -18,6 +18,7 @@ from app.api.admin.terms import router as admin_terms_router
 from app.api.public_hotels import router as public_hotel_router
 from app.api.public_bookings import router as public_booking_router
 from app.api.public_booking_otp import router as public_booking_otp_router
+from app.api.public_search import router as public_search_router
 from app.api.finance import router as finance_router
 from app.api.destinations import router as destination_router
 from app.api.password_reset import router as password_reset_router
@@ -33,7 +34,7 @@ for router in (
     availability_router, upload_router, upload_test_router,
     admin_hotel_router, admin_property_operations_router, admin_reservation_router,
     admin_reservation_management_router, admin_verification_router, admin_terms_router,
-    public_hotel_router, public_booking_router,
+    public_hotel_router, public_booking_router, public_search_router,
     public_booking_otp_router, finance_router, destination_router, password_reset_router,
     notification_router,
 ):

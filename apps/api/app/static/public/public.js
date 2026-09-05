@@ -22,11 +22,9 @@ function setDefaultSearchDates() {
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
-    // Always initialise the search with today/tomorrow when the fields are blank.
     if (!checkIn.value) checkIn.value = toLocalDateInputValue(today);
     if (!checkOut.value) checkOut.value = toLocalDateInputValue(tomorrow);
 
-    // Keep the checkout date valid when the user changes check-in.
     checkOut.min = checkIn.value;
     if (!checkOut.value || checkOut.value <= checkIn.value) {
         const nextDay = new Date(`${checkIn.value}T00:00:00`);
@@ -38,11 +36,7 @@ function setDefaultSearchDates() {
 
 function escapePublic(v) {
     return String(v ?? '').replace(/[&<>"']/g, m => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
     }[m]));
 }
 
@@ -96,10 +90,7 @@ async function loadPublicHotels(city = '') {
         const params = new URLSearchParams();
         if (city.trim()) params.set('city', city.trim());
         const { checkIn, checkOut } = getSearchDates();
-        if (checkIn && checkOut) {
-            params.set('check_in', checkIn);
-            params.set('check_out', checkOut);
-        }
+        if (checkIn && checkOut) { params.set('check_in', checkIn); params.set('check_out', checkOut); }
         const query = params.toString();
         const response = await fetch(`/public/hotels/${query ? `?${query}` : ''}`);
         if (!response.ok) throw new Error(`Hotel request failed: ${response.status}`);
@@ -176,3 +167,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (city) loadPublicHotels(city);
     });
 });
+
+// Booking-style search results override. The home page now opens the full results screen.
+function searchHotels() {
+    setDefaultSearchDates();
+    const destination = document.getElementById('destination')?.value?.trim() || '';
+    const checkIn = document.getElementById('check-in')?.value || '';
+    const checkOut = document.getElementById('check-out')?.value || '';
+    const params = new URLSearchParams();
+    if (destination) params.set('destination', destination);
+    if (checkIn) params.set('check_in', checkIn);
+    if (checkOut) params.set('check_out', checkOut);
+    location.href = '/static/public/search-results.html?' + params.toString();
+}
