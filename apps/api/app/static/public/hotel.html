@@ -1,1 +1,27 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>StayHub Property</title><link rel="stylesheet" href="/static/public/public.css"></head><body><header class="header"><div class="container header-inner"><a href="/" class="logo"><div class="logo-icon">S</div><div><strong>StayHub</strong><span>Hotels & Stays</span></div></a><nav class="main-nav"><a href="/">Hotels</a><a href="/static/public/owner-register.html" class="list-property">List Your Property</a></nav></div></header><main class="section"><div class="container"><div id="hotelLoading" class="loading">Loading property...</div><div id="hotelError" class="empty-state hidden"></div><div id="hotelDetail" class="hidden"></div></div></main><script src="/static/public/hotel.js?v=2"></script><script src="/static/public/public-hotel-facilities.js?v=1"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>StayHub Property</title>
+  <link rel="stylesheet" href="/static/public/hotel.css?v=1">
+</head>
+<body>
+  <header class="hotel-header">
+    <div class="hotel-shell hotel-header-inner">
+      <a href="/" class="hotel-brand"><span class="hotel-brand-mark">S</span><span><strong>StayHub</strong><small>Hotels & Stays</small></span></a>
+      <nav><a href="/">Hotels</a><a href="/static/public/search-results.html">Discover</a><a href="/static/public/owner-register.html" class="hotel-list-link">List Your Property</a></nav>
+    </div>
+  </header>
+  <main class="hotel-main">
+    <div class="hotel-shell">
+      <div id="hotelLoading" class="hotel-state"><span class="hotel-spinner"></span><strong>Loading your stay...</strong></div>
+      <div id="hotelError" class="hotel-state hotel-state-error hidden"></div>
+      <div id="hotelDetail" class="hidden"></div>
+    </div>
+  </main>
+  <footer class="hotel-footer"><div class="hotel-shell"><strong>StayHub</strong><span>Discover. Compare. Stay.</span></div></footer>
+  <script src="/static/public/hotel.js?v=3"></script>
+  <script src="/static/public/public-hotel-facilities.js?v=1"></script>
+</body>
+</html>
