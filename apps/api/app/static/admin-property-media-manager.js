@@ -21,6 +21,10 @@
     return `<div style="margin-top:10px"><label style="display:block;font-weight:600;margin-bottom:6px">${esc(label)}</label><input data-upload-file="${esc(messageId)}" type="file" accept="${accept}" class="input full"><button type="button" class="ghost" data-upload-endpoint="${esc(endpoint)}" data-upload-message="${esc(messageId)}" style="margin-top:8px">${esc(buttonLabel)}</button><span data-upload-status="${esc(messageId)}" class="muted" style="margin-left:10px"></span></div>`;
   }
 
+  function removeControl(endpoint, messageId, buttonLabel = 'Remove') {
+    return `<button type="button" class="ghost danger" data-remove-endpoint="${esc(endpoint)}" data-remove-message="${esc(messageId)}" style="margin-top:10px">${esc(buttonLabel)}</button><span data-remove-status="${esc(messageId)}" class="muted" style="margin-left:10px"></span>`;
+  }
+
   async function upload(endpoint, file, statusEl, after) {
     if (!file) { statusEl.textContent = 'Select a file first.'; return; }
     const body = new FormData(); body.append('file', file);
@@ -44,7 +48,7 @@
     const wrap = document.createElement('div');
     wrap.className = 'kv';
     wrap.style.cssText = 'display:block;padding:14px';
-    wrap.innerHTML = `<b>${esc(title)}</b>${mediaPreview(doc.url, title)}${fileControl('Replace document', endpoint, 'image/*,.pdf,.doc,.docx,.xls,.xlsx', id)}`;
+    wrap.innerHTML = `<b>${esc(title)}</b>${mediaPreview(doc.url, title)}${fileControl('Replace document', endpoint, 'image/*,.pdf,.doc,.docx,.xls,.xlsx', id)}${removeControl(endpoint, id, 'Remove document')}`;
     return wrap;
   }
 
@@ -52,7 +56,7 @@
     const wrap = document.createElement('div');
     wrap.className = 'kv';
     wrap.style.cssText = 'display:block;padding:14px';
-    wrap.innerHTML = `<b>${esc(title)}</b>${mediaPreview(url, title)}${fileControl('Replace document', endpoint, 'image/*,.pdf,.doc,.docx,.xls,.xlsx', id)}`;
+    wrap.innerHTML = `<b>${esc(title)}</b>${mediaPreview(url, title)}${fileControl('Replace document', endpoint, 'image/*,.pdf,.doc,.docx,.xls,.xlsx', id)}${removeControl(endpoint, id, 'Remove document')}`;
     return wrap;
   }
 
@@ -106,6 +110,16 @@
     tabs.querySelector('[data-tab-index="0"]')?.click();
   }
 
+  async function removeItem(endpoint, statusEl, after) {
+    if (!confirm('Remove this document? This will clear it from the property profile.')) return;
+    statusEl.textContent = 'Removing...';
+    try {
+      await req(endpoint, {method:'DELETE'});
+      statusEl.textContent = 'Removed successfully.';
+      if (after) await after();
+    } catch (e) { statusEl.textContent = e.message; }
+  }
+
   function wireUploads(root) {
     root.querySelectorAll('[data-upload-endpoint]').forEach(btn => {
       if (btn.dataset.bound === '1') return;
@@ -115,6 +129,21 @@
         const input = root.querySelector(`[data-upload-file="${CSS.escape(id)}"]`);
         const status = root.querySelector(`[data-upload-status="${CSS.escape(id)}"]`);
         await upload(btn.dataset.uploadEndpoint, input?.files?.[0], status, async () => {
+          if (typeof window.stayhubOpenProperty === 'function' && root.dataset.mediaRefresh !== '1') {
+            root.dataset.mediaRefresh = '1';
+            try { await window.stayhubOpenProperty(Number(root.dataset.hotelId)); } finally { root.dataset.mediaRefresh = '0'; }
+          }
+        });
+      });
+    });
+
+    root.querySelectorAll('[data-remove-endpoint]').forEach(btn => {
+      if (btn.dataset.bound === '1') return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.removeMessage;
+        const status = root.querySelector(`[data-remove-status="${CSS.escape(id)}"]`);
+        await removeItem(btn.dataset.removeEndpoint, status, async () => {
           if (typeof window.stayhubOpenProperty === 'function' && root.dataset.mediaRefresh !== '1') {
             root.dataset.mediaRefresh = '1';
             try { await window.stayhubOpenProperty(Number(root.dataset.hotelId)); } finally { root.dataset.mediaRefresh = '0'; }
