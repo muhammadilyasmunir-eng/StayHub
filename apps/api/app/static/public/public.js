@@ -17,16 +17,11 @@ function setDefaultSearchDates() {
     const checkIn = document.getElementById('check-in');
     const checkOut = document.getElementById('check-out');
     if (!checkIn || !checkOut) return;
-
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
-
-    // Always initialise the search with today/tomorrow when the fields are blank.
     if (!checkIn.value) checkIn.value = toLocalDateInputValue(today);
     if (!checkOut.value) checkOut.value = toLocalDateInputValue(tomorrow);
-
-    // Keep the checkout date valid when the user changes check-in.
     checkOut.min = checkIn.value;
     if (!checkOut.value || checkOut.value <= checkIn.value) {
         const nextDay = new Date(`${checkIn.value}T00:00:00`);
@@ -38,11 +33,7 @@ function setDefaultSearchDates() {
 
 function escapePublic(v) {
     return String(v ?? '').replace(/[&<>"']/g, m => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
     }[m]));
 }
 
@@ -113,7 +104,9 @@ async function loadPublicHotels(city = '') {
             const location = `${escapePublic(h.city || '')}${h.country ? `, ${escapePublic(h.country)}` : ''}`;
             const ratingLabel = rating != null ? Number(rating).toFixed(1) : 'New';
             const priceLabel = price != null ? `From ${formatMoney(price, currency)}` : 'Check availability';
-            const detailParams = new URLSearchParams(); if (checkIn) detailParams.set('check_in', checkIn); if (checkOut) detailParams.set('check_out', checkOut);
+            const detailParams = new URLSearchParams();
+            if (checkIn) detailParams.set('check_in', checkIn);
+            if (checkOut) detailParams.set('check_out', checkOut);
             const detailUrl = '/hotel/' + encodeURIComponent(h.slug) + (detailParams.toString() ? '?' + detailParams.toString() : '');
             return `<article class="hotel-card" style="overflow:hidden;cursor:pointer" onclick="location.href='${detailUrl}'">
                 <div class="hotel-image" style="height:220px;${photo ? `background-image:linear-gradient(to top,rgba(0,0,0,.25),rgba(0,0,0,0)),url('${escapePublic(photo)}');background-size:cover;background-position:center;` : ''}">${photo ? '' : '🏨'}</div>
@@ -134,9 +127,14 @@ async function loadPublicHotels(city = '') {
 
 function searchHotels() {
     setDefaultSearchDates();
-    const city = document.getElementById('destination')?.value || '';
-    document.getElementById('properties')?.scrollIntoView({ behavior: 'smooth' });
-    loadPublicHotels(city);
+    const city = document.getElementById('destination')?.value?.trim() || '';
+    const checkIn = document.getElementById('check-in')?.value || '';
+    const checkOut = document.getElementById('check-out')?.value || '';
+    const params = new URLSearchParams();
+    if (city) params.set('destination', city);
+    if (checkIn) params.set('check_in', checkIn);
+    if (checkOut) params.set('check_out', checkOut);
+    window.location.href = `/static/public/search-results.html?${params.toString()}`;
 }
 
 function searchCity(city) {
